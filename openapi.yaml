@@ -1,0 +1,486 @@
+openapi: 3.0.3
+info:
+  title: Digital Bridge Assistant API
+  version: 1.0.0
+  description: 'Level 2 REST API for Digital Bridge Assistant (Track 3: Multilingual
+    Assistant & Live Help). Provides retrieval-grounded course Q&A in English and
+    Amharic, offline FAQ fallback, Telegram bot webhook, and 160-char low-bandwidth
+    SMS delivery adapter.'
+paths:
+  /api/v1/ai/answer/:
+    post:
+      operationId: api_v1_ai_answer_create
+      description: Answer a question grounded in course materials. Cites document
+        title, section, and page. Refuses honestly if no evidence is found.
+      summary: Generate Grounded Course Answer
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnswerRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AnswerRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AnswerRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerResponse'
+          description: Successful answer
+        '400':
+          description: Invalid request data
+  /api/v1/ai/status/:
+    get:
+      operationId: api_v1_ai_status_retrieve
+      description: Check status, active provider, and language capabilities of the
+        AI Engine.
+      summary: AI Engine Status
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIStatusResponse'
+          description: ''
+  /api/v1/channels/deliveries/{delivery_id}/:
+    get:
+      operationId: api_v1_channels_deliveries_retrieve
+      description: Retrieve delivery tracking details for an outbound SMS or Telegram
+        notification.
+      summary: Get Delivery Status
+      parameters:
+      - in: path
+        name: delivery_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageDelivery'
+          description: ''
+        '404':
+          description: Delivery record not found
+  /api/v1/channels/notifications/send/:
+    post:
+      operationId: api_v1_channels_notifications_send_create
+      description: Dispatches a job alert or system notification to a learner via
+        Telegram or SMS.
+      summary: Send Outbound Notification (Telegram/SMS)
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSendRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationSendRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationSendRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageDelivery'
+          description: Notification queued/delivered
+        '400':
+          description: Validation error
+  /api/v1/channels/sms/inbound/:
+    get:
+      operationId: api_v1_channels_sms_inbound_retrieve
+      description: Inbound SMS endpoint for low-bandwidth access. Accepts 'from' and
+        'text'. Returns plain text course answer of at most 160 characters.
+      summary: Inbound SMS Gateway Endpoint
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Plain text response <= 160 characters
+        '400':
+          description: Invalid request
+    post:
+      operationId: api_v1_channels_sms_inbound_create
+      description: Inbound SMS endpoint for low-bandwidth access. Accepts 'from' and
+        'text'. Returns plain text course answer of at most 160 characters.
+      summary: Inbound SMS Gateway Endpoint
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SMSInboundRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SMSInboundRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SMSInboundRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Plain text response <= 160 characters
+        '400':
+          description: Invalid request
+  /api/v1/channels/telegram/webhook/:
+    post:
+      operationId: api_v1_channels_telegram_webhook_create
+      description: Receives Telegram webhook updates from Telegram Bot servers.
+      summary: Telegram Bot Webhook
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramWebhookRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TelegramWebhookRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TelegramWebhookRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Update received and processed successfully
+  /sms/inbound:
+    get:
+      operationId: sms_inbound_retrieve
+      description: Inbound SMS endpoint for low-bandwidth access. Accepts 'from' and
+        'text'. Returns plain text course answer of at most 160 characters.
+      summary: Inbound SMS Gateway Endpoint
+      tags:
+      - sms
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Plain text response <= 160 characters
+        '400':
+          description: Invalid request
+    post:
+      operationId: sms_inbound_create
+      description: Inbound SMS endpoint for low-bandwidth access. Accepts 'from' and
+        'text'. Returns plain text course answer of at most 160 characters.
+      summary: Inbound SMS Gateway Endpoint
+      tags:
+      - sms
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SMSInboundRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SMSInboundRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SMSInboundRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Plain text response <= 160 characters
+        '400':
+          description: Invalid request
+components:
+  schemas:
+    AIStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          default: healthy
+        active_provider:
+          type: string
+        supported_providers:
+          type: array
+          items:
+            type: string
+        grounding_threshold:
+          type: number
+          format: double
+        supported_languages:
+          type: array
+          items:
+            type: string
+        offline_fallback_enabled:
+          type: boolean
+          default: true
+      required:
+      - active_provider
+      - grounding_threshold
+      - supported_languages
+      - supported_providers
+    AnswerRequestRequest:
+      type: object
+      properties:
+        question:
+          type: string
+          minLength: 1
+          description: Learner's course or platform question
+          maxLength: 1000
+        course_id:
+          type: string
+          minLength: 1
+          default: course-va-101
+          description: Target course identifier
+        language:
+          allOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          default: am
+          description: |-
+            Language code ('en' or 'am')
+
+            * `en` - en
+            * `am` - am
+        provider:
+          allOf:
+          - $ref: '#/components/schemas/ProviderEnum'
+          description: |-
+            Optional AI provider override for testing
+
+            * `offline` - offline
+            * `cloud` - cloud
+            * `local` - local
+            * `mock` - mock
+      required:
+      - question
+    AnswerResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        language:
+          type: string
+        grounded:
+          type: boolean
+        fallback_used:
+          type: boolean
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+        provider:
+          type: string
+      required:
+      - answer
+      - citations
+      - fallback_used
+      - grounded
+      - language
+      - provider
+    Citation:
+      type: object
+      properties:
+        chunk_id:
+          type: string
+        document_title:
+          type: string
+        section:
+          type: string
+        page:
+          type: integer
+          default: 1
+        anchor:
+          type: string
+        url:
+          type: string
+        relevance:
+          type: number
+          format: double
+      required:
+      - document_title
+      - section
+    LanguageEnum:
+      enum:
+      - en
+      - am
+      type: string
+      description: |-
+        * `en` - en
+        * `am` - am
+    MessageDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        channel:
+          $ref: '#/components/schemas/MessageDeliveryChannelEnum'
+        recipient:
+          type: string
+          description: Destination chat ID or phone number
+          maxLength: 128
+        content:
+          type: string
+          description: Message text delivered
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - channel
+      - content
+      - created_at
+      - id
+      - recipient
+    MessageDeliveryChannelEnum:
+      enum:
+      - telegram
+      - sms
+      - web
+      type: string
+      description: |-
+        * `telegram` - Telegram
+        * `sms` - SMS / Text
+        * `web` - Web Widget
+    NotificationSendChannelEnum:
+      enum:
+      - telegram
+      - sms
+      type: string
+      description: |-
+        * `telegram` - telegram
+        * `sms` - sms
+    NotificationSendRequest:
+      type: object
+      properties:
+        recipient:
+          type: string
+          minLength: 1
+          description: Destination Telegram chat ID or Ethiopian phone number
+        message:
+          type: string
+          minLength: 1
+          description: Notification message text
+        channel:
+          allOf:
+          - $ref: '#/components/schemas/NotificationSendChannelEnum'
+          default: telegram
+        title:
+          type: string
+          description: Optional alert headline
+      required:
+      - message
+      - recipient
+    ProviderEnum:
+      enum:
+      - offline
+      - cloud
+      - local
+      - mock
+      type: string
+      description: |-
+        * `offline` - offline
+        * `cloud` - cloud
+        * `local` - local
+        * `mock` - mock
+    SMSInboundRequest:
+      type: object
+      description: |-
+        Accepts inbound SMS data from gateways or curl tests.
+        Supports either 'from' or 'sender', and 'text', 'message', or 'body'.
+      properties:
+        from_number:
+          type: string
+          minLength: 1
+          description: Sender Ethiopian phone number (e.g. 0911223344 or +251911223344)
+        text:
+          type: string
+          minLength: 1
+          description: Message text content
+    StatusEnum:
+      enum:
+      - pending
+      - sent
+      - delivered
+      - failed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `sent` - Sent
+        * `delivered` - Delivered
+        * `failed` - Failed
+    TelegramWebhookRequest:
+      type: object
+      properties:
+        update_id:
+          type: integer
+          description: Unique Telegram update identifier
+        message:
+          type: object
+          additionalProperties: {}
+          description: Telegram message object
+        callback_query:
+          type: object
+          additionalProperties: {}
+          description: Telegram callback query object
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "faq-1",
+    "category": "accessibility",
+    "keywords": ["language", "amharic", "english", "switch", "change", "ቋንቋ", "አማርኛ", "እንግሊዝኛ"],
+    "question_en": "How do I switch the language to Amharic or English?",
+    "question_am": "ቋንቋውን ወደ አማርኛ ወይም እንግሊዝኛ እንዴት መቀየር እችላለሁ?",
+    "answer_en": "You can change your language anytime from the widget settings or by typing /language in Telegram. Both English and Amharic are fully supported.",
+    "answer_am": "በማንኛውም ጊዜ በዊጅት ማስተካከያ (Settings) ውስጥ ወይም በቴሌግራም /language ብለው በመላክ ቋንቋ መቀየር ይችላሉ። አማርኛ እና እንግሊዝኛ ሙሉ በሙሉ ይደገፋሉ።"
+  },
+  {
+    "id": "faq-2",
+    "category": "accessibility",
+    "keywords": ["screen reader", "nvda", "talkback", "voice", "ድምጽ", "ስክሪን ሪደር"],
+    "question_en": "How does Digital Bridge support screen readers and keyboard navigation?",
+    "question_am": "ዲጂታል ብሪጅ ስክሪን ሪደር እና የኪቦርድ አጠቃቀምን እንዴት ይደግፋል?",
+    "answer_en": "The widget and all web components are WCAG 2.2 AA compliant with live polite aria regions for new messages, full keyboard navigation (Tab, Enter, Esc), and 200% zoom reflow.",
+    "answer_am": "ይህ ዊጅት በሙሉ የWCAG 2.2 AA ደረጃን የጠበቀ ሲሆን፣ አዳዲስ መልዕክቶች በስክሪን ሪደር በግልጽ እንዲነበቡ፣ በኪቦርድ ብቻ እንዲሠራ እና በ200% ማጉላት እንዲታይ ተደርጎ የተዘጋጀ ነው።"
+  },
+  {
+    "id": "faq-3",
+    "category": "support",
+    "keywords": ["human", "agent", "help", "teacher", "tutor", "talk", "escalate", "ሰው", "እርዳታ", "አስተማሪ", "ድጋፍ"],
+    "question_en": "How can I speak to a human tutor or support agent?",
+    "question_am": "ከሰው አስተማሪ ወይም የድጋፍ ባለሙያ ጋር እንዴት መነጋገር እችላለሁ?",
+    "answer_en": "Click the 'Talk to a human' button in the chat panel. A support ticket will be opened and an agent will reply in this channel.",
+    "answer_am": "በውይይት መስኮቱ ላይ 'ከሰው ጋር ተነጋገር' (Talk to a human) የሚለውን ቁልፍ ይጫኑ። የድጋፍ ጥያቄ ተመዝግቦ የድጋፍ ባለሙያ መልስ ይሰጥዎታል።"
+  },
+  {
+    "id": "faq-4",
+    "category": "careers",
+    "keywords": ["job", "career", "interview", "accommodation", "accommodations", "ሥራ", "ቃለ መጠይቅ", "ድጋፍ"],
+    "question_en": "How do I request accommodations for a job interview?",
+    "question_am": "ለሥራ ቃለ መጠይቅ አስፈላጊ ድጋፎችን (Accommodations) እንዴት መጠየቅ እችላለሁ?",
+    "answer_en": "Open the Career Gateway section, choose the job listing, and submit an accommodation request. Your request is kept strictly private without requiring diagnosis disclosure.",
+    "answer_am": "የሥራ ዕድሎች (Career Gateway) ክፍል በመግባት የሥራውን ዝርዝር መርጠው የድጋፍ መጠየቂያውን ይሙሉ፤ የጤና ሚስጥርዎን መግለጽ ሳያስፈልግዎት በጥንቃቄ ይስተናገዳል።"
+  },
+  {
+    "id": "faq-5",
+    "category": "course",
+    "keywords": ["course", "va", "virtual assistant", "ኮርስ", "ቨርቹዋል ረዳት"],
+    "question_en": "What is the Virtual Assistant course about?",
+    "question_am": "የቨርቹዋል ረዳት (VA) ኮርስ ስለ ምን የሚያስተምር ነው?",
+    "answer_en": "The course covers foundational skills, digital tools, AI fluency, and remote work readiness to prepare you as a modern, adaptable Virtual Assistant.",
+    "answer_am": "ኮርሱ የቨርቹዋል ረዳት ሙያ መሠረታዊ ዕውቀቶችን፣ የዲጂታል መሣሪያዎችን አጠቃቀም፣ የAI አጋዥነትን እና የርቀት ሥራ ዝግጁነትን የሚያስተምር ነው።"
+  }
+]
