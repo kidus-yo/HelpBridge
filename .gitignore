@@ -49,3 +49,8 @@ staticfiles/
 .pytest_cache/
 .coverage
 htmlcov/
+.DS_Store
+
+# External static fixtures
+Savanna-static-pages/
+savanna_static_pages/
