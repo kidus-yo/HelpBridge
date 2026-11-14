@@ -53,7 +53,7 @@ INSTALLED_APPS = [
     # Shared foundation
     "common.apps.CommonConfig",
 
-    # Your backend apps
+    # Platform foundation
     "platforms.apps.PlatformsConfig",
     "courses.apps.CoursesConfig",
     "knowledge.apps.KnowledgeConfig",
@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     # Teammates' apps
     "chat.apps.ChatConfig",
     "accessibility.apps.AccessibilityConfig",
+    "support.apps.SupportConfig",
+    "careers.apps.CareersConfig",
 ]
 
 MIDDLEWARE = [
