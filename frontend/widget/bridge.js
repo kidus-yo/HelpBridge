@@ -4,31 +4,33 @@
  * 
  * Developer: Koket (Developer 2 — Conversation Platform & Accessibility Engineer)
  * Conformance: WCAG 2.2 Level AA, Keyboard-only navigation, ARIA live region announcements,
- * Multilingual (English & Amharic), 200% zoom reflow, high-contrast, simple mode.
+ * Multilingual (English & Amharic), 200% zoom reflow, high-contrast, simple mode, RTL.
  */
 
 (function () {
   'use strict';
 
-  // Read configuration from the script tag
+  // Read configuration from script tag
   const currentScript = document.currentScript || (function() {
     const scripts = document.getElementsByTagName('script');
     return scripts[scripts.length - 1];
   })();
 
   const API_BASE = (currentScript && currentScript.getAttribute('data-api')) || 'http://localhost:8000';
-  const COURSE_ID = currentScript ? currentScript.getAttribute('data-course') : null;
-  const INSTITUTION_ID = currentScript ? currentScript.getAttribute('data-institution') : null;
+  const COURSE_ID = (currentScript && currentScript.getAttribute('data-course')) || 'course-va-101';
+  const INSTITUTION_ID = (currentScript && currentScript.getAttribute('data-institution')) || 'inst-default';
   const INITIAL_LANG = (currentScript && currentScript.getAttribute('data-lang')) || 'en';
 
   // State
   let sessionId = null;
   let isOpen = false;
+  let viewMode = 'chat'; // 'chat' | 'settings'
   let currentLang = INITIAL_LANG; // 'en' | 'am'
   let simpleMode = false;
   let textSize = 'normal'; // 'normal' | 'large' | 'xlarge'
-  let textDirection = 'ltr';
+  let isRtl = false;
   let highContrast = false;
+  let voiceEnabled = true;
   let messages = [];
   let isLoading = false;
   let previousFocusedElement = null;
@@ -44,15 +46,21 @@
       sendButton: 'Send message',
       talkToHuman: 'Talk to a human',
       settingsTitle: 'Accessibility Settings',
-      settingsButton: 'Accessibility settings',
+      settingsButton: 'Settings',
+      backToChat: 'Back to Chat',
       simpleMode: 'Simple Mode',
+      simpleModeDesc: 'Reduces visual clutter and uses simplified text',
       textSize: 'Text Size',
       language: 'Language',
       contrast: 'High Contrast',
-      direction: 'Text Direction',
+      contrastDesc: 'Enhances border outlines and high-contrast colors',
+      direction: 'Right-to-Left (RTL)',
+      directionDesc: 'Aligns text and interface from right to left',
+      voice: 'Voice Features',
+      voiceDesc: 'Enable speech recognition dictation and audio feedback',
       normal: 'Normal',
-      large: 'Large',
-      xlarge: 'Extra Large',
+      large: 'Large (115%)',
+      xlarge: 'Extra Large (135%)',
       connecting: 'Connecting...',
       typing: 'Assistant is finding verified course evidence...',
       citationsTitle: 'Verified Sources:',
@@ -63,8 +71,7 @@
       cancel: 'Cancel',
       offlineFaqBadge: 'Offline FAQ',
       groundedBadge: 'Verified Course Material',
-      errorNetwork: 'Unable to reach the assistant server. Please check your connection.',
-      errorEmpty: 'Please enter a message before sending.',
+      errorNetwork: 'Unable to reach the assistant server. Operating in offline mode.',
       voiceInput: 'Voice input (Dictate)',
       voiceUnsupported: 'Speech recognition is not supported on this browser. Please type your message.',
       liveNewMessagePrefix: 'New message from'
@@ -78,15 +85,21 @@
       sendButton: 'መልዕክት ላክ',
       talkToHuman: 'የሰው ድጋፍ',
       settingsTitle: 'የተደራሽነት ቅንብሮች',
-      settingsButton: 'የተደራሽነት ቅንብሮች',
+      settingsButton: 'ቅንብሮች',
+      backToChat: 'ወደ ውይይት ተመለስ',
       simpleMode: 'ቀላል ሁነታ (Simple Mode)',
+      simpleModeDesc: 'የማያስፈልጉ ዝርዝሮችን በመቀነስ ጽሑፉን ያቃልላል',
       textSize: 'የጽሑፍ መጠን',
-      language: 'ቋንቋ',
+      language: 'ቋንቋ (Language)',
       contrast: 'ከፍተኛ ንፅፅር (High Contrast)',
-      direction: 'የጽሑፍ አቅጣጫ',
+      contrastDesc: 'ለዓይን ግልጽ የሆኑ ቀለሞችን እና መስመሮችን ያደምቃል',
+      direction: 'ከቀኝ ወደ ግራ (RTL)',
+      directionDesc: 'የጽሑፍ አቅጣጫውን ከቀኝ ወደ ግራ ያደርጋል',
+      voice: 'የድምፅ ግብዓት (Voice)',
+      voiceDesc: 'በድምፅ መልዕክት ማስገባትን ያነቃል',
       normal: 'መደበኛ',
-      large: 'ትልቅ',
-      xlarge: 'በጣም ትልቅ',
+      large: 'ትልቅ (115%)',
+      xlarge: 'በጣም ትልቅ (135%)',
       connecting: 'በመገናኘት ላይ...',
       typing: 'ረዳቱ የተረጋገጠ የትምህርት መረጃ በማፈላለግ ላይ ነው...',
       citationsTitle: 'የተረጋገጡ ምንጮች፡',
@@ -97,8 +110,7 @@
       cancel: 'ሰርዝ',
       offlineFaqBadge: 'ከመስመር ውጭ FAQ',
       groundedBadge: 'የተረጋገጠ የኮርስ ሰነድ',
-      errorNetwork: 'ከአገልጋዩ ጋር መገናኘት አልተቻለም። እባክዎ ግንኙነትዎን ያረጋግጡ።',
-      errorEmpty: 'እባክዎ መልዕክትዎን ያስገቡ።',
+      errorNetwork: 'ከአገልጋዩ ጋር መገናኘት አልተቻለም። ከመስመር ውጭ ሁነታ ላይ ይገኛል።',
       voiceInput: 'በድምፅ መልዕክት አስገባ',
       voiceUnsupported: 'ይህ አሳሽ ድምፅን ወደ ጽሑፍ መቀየር አይደግፍም። እባክዎ በጽሑፍ ያስገቡ።',
       liveNewMessagePrefix: 'አዲስ መልዕክት ከ'
@@ -110,9 +122,9 @@
     return langDict[key] || I18N.en[key] || key;
   }
 
-  // Inject Styles into Shadow Root or Scoped Container
+  // Scoped Stylesheet for Host-Isolation & Accessibility
   const STYLES = `
-    :host, #digital-bridge-root {
+    #digital-bridge-root {
       --db-primary: #1e3a8a;
       --db-primary-dark: #172554;
       --db-accent: #2563eb;
@@ -156,6 +168,21 @@
     #digital-bridge-root.db-simple-mode .db-decorative,
     #digital-bridge-root.db-simple-mode .db-badge-extra {
       display: none !important;
+    }
+
+    #digital-bridge-root.db-rtl {
+      direction: rtl;
+      text-align: right;
+    }
+
+    #digital-bridge-root.db-rtl .db-launcher {
+      right: auto;
+      left: 24px;
+    }
+
+    #digital-bridge-root.db-rtl .db-panel {
+      right: auto;
+      left: 24px;
     }
 
     #digital-bridge-root * {
@@ -281,10 +308,6 @@
       cursor: pointer;
     }
 
-    .db-btn-text:hover {
-      background: var(--db-surface);
-    }
-
     .db-btn-human {
       background: #fee2e2;
       border: 1px solid #ef4444;
@@ -404,30 +427,47 @@
       cursor: not-allowed;
     }
 
-    /* Settings View */
-    .db-settings-panel {
+    /* Accessibility Settings View */
+    .db-settings-view {
       padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 16px;
       background: var(--db-bg);
       flex: 1;
       overflow-y: auto;
     }
 
-    .db-setting-row {
+    .db-setting-item {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding-bottom: 8px;
+      align-items: flex-start;
+      gap: 12px;
+      padding-bottom: 12px;
       border-bottom: 1px solid var(--db-border);
     }
 
-    .db-setting-row label {
-      font-weight: 500;
+    .db-setting-label {
+      font-weight: 600;
+      font-size: 0.95rem;
     }
 
-    /* Live Announcement Region */
+    .db-setting-desc {
+      font-size: 0.8rem;
+      color: var(--db-text-muted);
+      margin-top: 2px;
+    }
+
+    .db-select {
+      padding: 6px 10px;
+      border: 1px solid var(--db-border);
+      border-radius: 6px;
+      background: var(--db-bg);
+      color: var(--db-text);
+      font-size: 0.9rem;
+    }
+
+    /* Screen reader only */
     .db-sr-only {
       position: absolute;
       width: 1px;
@@ -441,7 +481,6 @@
     }
   `;
 
-  // Initialize and Render Widget
   function init() {
     if (document.getElementById('digital-bridge-root')) return;
 
@@ -449,7 +488,6 @@
     hostDiv.id = 'digital-bridge-root';
     document.body.appendChild(hostDiv);
 
-    // Apply styles
     const styleEl = document.createElement('style');
     styleEl.textContent = STYLES;
     document.head.appendChild(styleEl);
@@ -462,18 +500,17 @@
     const root = document.getElementById('digital-bridge-root');
     if (!root) return;
 
-    // Apply class preferences to root
     root.className = [
       highContrast ? 'db-high-contrast' : '',
       simpleMode ? 'db-simple-mode' : '',
       textSize === 'large' ? 'db-text-large' : '',
       textSize === 'xlarge' ? 'db-text-xlarge' : '',
+      isRtl ? 'db-rtl' : ''
     ].filter(Boolean).join(' ');
 
-    root.dir = textDirection;
+    root.dir = isRtl ? 'rtl' : 'ltr';
 
     root.innerHTML = `
-      <!-- Accessible Live Announcement Region for Screen Readers -->
       <div id="db-live-announcer" class="db-sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
       <!-- Floating Launcher Button -->
@@ -491,7 +528,7 @@
         <span>${t('title')}</span>
       </button>
 
-      <!-- Main Dialog Window -->
+      <!-- Main Assistant Dialog -->
       <section 
         id="db-dialog" 
         class="db-panel ${isOpen ? '' : 'db-hidden'}" 
@@ -506,13 +543,9 @@
             <p>${t('subtitle')}</p>
           </div>
           <div class="db-header-actions">
-            <!-- Language switcher -->
-            <button type="button" class="db-btn-icon" id="db-btn-lang" title="${currentLang === 'en' ? 'Switch to Amharic' : 'Switch to English'}" aria-label="Toggle language">
-              ${currentLang === 'en' ? 'አማ' : 'EN'}
-            </button>
             <!-- Settings button -->
-            <button type="button" class="db-btn-icon" id="db-btn-settings" title="${t('settingsButton')}" aria-label="${t('settingsButton')}">
-              ⚙️
+            <button type="button" class="db-btn-icon" id="db-btn-settings" title="${viewMode === 'settings' ? t('backToChat') : t('settingsTitle')}" aria-label="${viewMode === 'settings' ? t('backToChat') : t('settingsTitle')}">
+              ${viewMode === 'settings' ? '💬' : '⚙️'}
             </button>
             <!-- Close dialog -->
             <button type="button" class="db-btn-icon" id="db-btn-close" aria-label="${t('closeLabel')}">
@@ -521,48 +554,133 @@
           </div>
         </header>
 
-        <!-- Quick Access Toolbar -->
-        <div class="db-quick-toolbar">
-          <button type="button" class="db-btn-text db-btn-human" id="db-btn-human">
-            🤝 ${t('talkToHuman')}
-          </button>
-          <button type="button" class="db-btn-text" id="db-btn-simple">
-            ${simpleMode ? '✓ ' : ''}${t('simpleMode')}
-          </button>
-        </div>
-
-        <!-- Chat Messages Container -->
-        <div class="db-messages" id="db-messages-list" role="log" aria-label="Chat history">
-          ${renderMessages()}
-        </div>
-
-        <!-- Loading indicator -->
-        ${isLoading ? `<div style="padding: 6px 14px; font-size: 0.85rem; color: var(--db-text-muted); font-style: italic;">${t('typing')}</div>` : ''}
-
-        <!-- Message Input -->
-        <form class="db-input-area" id="db-input-form">
-          <div class="db-input-row">
-            <input 
-              type="text" 
-              class="db-input" 
-              id="db-msg-input" 
-              placeholder="${t('placeholder')}" 
-              autocomplete="off" 
-              aria-label="${t('placeholder')}" />
-            
-            <button type="button" class="db-btn-text" id="db-btn-mic" title="${t('voiceInput')}" aria-label="${t('voiceInput')}">
-              🎤
-            </button>
-
-            <button type="submit" class="db-btn-send" id="db-btn-send" ${isLoading ? 'disabled' : ''}>
-              ${t('sendButton')}
-            </button>
-          </div>
-        </form>
+        <!-- View Body: Either Chat or Settings -->
+        ${viewMode === 'settings' ? renderSettingsView() : renderChatView()}
       </section>
     `;
 
     bindEvents();
+  }
+
+  function renderChatView() {
+    return `
+      <!-- Quick Access Toolbar -->
+      <div class="db-quick-toolbar">
+        <button type="button" class="db-btn-text db-btn-human" id="db-btn-human">
+          🤝 ${t('talkToHuman')}
+        </button>
+        <button type="button" class="db-btn-text" id="db-btn-quick-lang">
+          🌐 ${currentLang === 'en' ? 'አማርኛ' : 'English'}
+        </button>
+        <button type="button" class="db-btn-text" id="db-btn-simple">
+          ${simpleMode ? '✓ ' : ''}${t('simpleMode')}
+        </button>
+      </div>
+
+      <!-- Messages List -->
+      <div class="db-messages" id="db-messages-list" role="log" aria-label="Conversation history">
+        ${renderMessages()}
+      </div>
+
+      <!-- Loading / Typing Indicator -->
+      ${isLoading ? `<div style="padding: 6px 14px; font-size: 0.85rem; color: var(--db-text-muted); font-style: italic;">${t('typing')}</div>` : ''}
+
+      <!-- Message Input Form -->
+      <form class="db-input-area" id="db-input-form">
+        <div class="db-input-row">
+          <input 
+            type="text" 
+            class="db-input" 
+            id="db-msg-input" 
+            placeholder="${t('placeholder')}" 
+            autocomplete="off" 
+            aria-label="${t('placeholder')}" />
+          
+          ${voiceEnabled ? `
+            <button type="button" class="db-btn-text" id="db-btn-mic" title="${t('voiceInput')}" aria-label="${t('voiceInput')}">
+              🎤
+            </button>
+          ` : ''}
+
+          <button type="submit" class="db-btn-send" id="db-btn-send" ${isLoading ? 'disabled' : ''}>
+            ${t('sendButton')}
+          </button>
+        </div>
+      </form>
+    `;
+  }
+
+  function renderSettingsView() {
+    return `
+      <div class="db-settings-view">
+        <h3 style="margin: 0 0 8px 0; font-size: 1.05rem;">${t('settingsTitle')}</h3>
+        
+        <!-- Language setting -->
+        <div class="db-setting-item">
+          <div>
+            <div class="db-setting-label">${t('language')}</div>
+            <div class="db-setting-desc">Switch between English and Amharic</div>
+          </div>
+          <select id="db-set-lang" class="db-select" aria-label="${t('language')}">
+            <option value="en" ${currentLang === 'en' ? 'selected' : ''}>English</option>
+            <option value="am" ${currentLang === 'am' ? 'selected' : ''}>አማርኛ (Amharic)</option>
+          </select>
+        </div>
+
+        <!-- Text Size -->
+        <div class="db-setting-item">
+          <div>
+            <div class="db-setting-label">${t('textSize')}</div>
+            <div class="db-setting-desc">Scale text for readability</div>
+          </div>
+          <select id="db-set-size" class="db-select" aria-label="${t('textSize')}">
+            <option value="normal" ${textSize === 'normal' ? 'selected' : ''}>${t('normal')}</option>
+            <option value="large" ${textSize === 'large' ? 'selected' : ''}>${t('large')}</option>
+            <option value="xlarge" ${textSize === 'xlarge' ? 'selected' : ''}>${t('xlarge')}</option>
+          </select>
+        </div>
+
+        <!-- Simple Mode -->
+        <div class="db-setting-item">
+          <div>
+            <div class="db-setting-label">${t('simpleMode')}</div>
+            <div class="db-setting-desc">${t('simpleModeDesc')}</div>
+          </div>
+          <input type="checkbox" id="db-set-simple" ${simpleMode ? 'checked' : ''} style="width: 20px; height: 20px;" aria-label="${t('simpleMode')}" />
+        </div>
+
+        <!-- High Contrast -->
+        <div class="db-setting-item">
+          <div>
+            <div class="db-setting-label">${t('contrast')}</div>
+            <div class="db-setting-desc">${t('contrastDesc')}</div>
+          </div>
+          <input type="checkbox" id="db-set-contrast" ${highContrast ? 'checked' : ''} style="width: 20px; height: 20px;" aria-label="${t('contrast')}" />
+        </div>
+
+        <!-- RTL display -->
+        <div class="db-setting-item">
+          <div>
+            <div class="db-setting-label">${t('direction')}</div>
+            <div class="db-setting-desc">${t('directionDesc')}</div>
+          </div>
+          <input type="checkbox" id="db-set-rtl" ${isRtl ? 'checked' : ''} style="width: 20px; height: 20px;" aria-label="${t('direction')}" />
+        </div>
+
+        <!-- Voice features -->
+        <div class="db-setting-item">
+          <div>
+            <div class="db-setting-label">${t('voice')}</div>
+            <div class="db-setting-desc">${t('voiceDesc')}</div>
+          </div>
+          <input type="checkbox" id="db-set-voice" ${voiceEnabled ? 'checked' : ''} style="width: 20px; height: 20px;" aria-label="${t('voice')}" />
+        </div>
+
+        <button type="button" class="db-btn-send" id="db-btn-done-settings" style="margin-top: 12px; width: 100%;">
+          ${t('backToChat')}
+        </button>
+      </div>
+    `;
   }
 
   function renderMessages() {
@@ -579,7 +697,6 @@
       const isLearner = msg.sender_type === 'learner';
       const isAgent = msg.sender_type === 'agent';
       const citations = (msg.metadata && msg.metadata.citations) || [];
-      const grounded = msg.metadata && msg.metadata.grounded;
 
       let citationsHtml = '';
       if (citations.length > 0) {
@@ -646,15 +763,15 @@
     if (list) list.scrollTop = list.scrollHeight;
   }
 
-  // Session Management
+  // Session & Accessibility API Communication
   async function initSession() {
     try {
       const payload = {
         channel: 'web',
         preferred_language: currentLang,
+        course_id: COURSE_ID,
+        institution_id: INSTITUTION_ID
       };
-      if (COURSE_ID) payload.course_id = COURSE_ID;
-      if (INSTITUTION_ID) payload.institution_id = INSTITUTION_ID;
 
       const res = await fetch(`${API_BASE}/api/v1/chat/sessions/`, {
         method: 'POST',
@@ -668,7 +785,7 @@
         loadAccessibilityPreferences();
       }
     } catch (err) {
-      console.warn('Digital Bridge Assistant running in offline/local mock mode.');
+      // Operates gracefully with default settings if offline
     }
   }
 
@@ -680,29 +797,38 @@
         const data = await res.json();
         simpleMode = !!data.simple_mode;
         textSize = data.text_size || 'normal';
-        textDirection = data.text_direction || 'ltr';
+        isRtl = !!data.right_to_left || data.text_direction === 'rtl';
         highContrast = !!data.high_contrast;
-        if (data.preferred_language) currentLang = data.preferred_language;
+        voiceEnabled = data.voice_enabled !== false;
+        if (data.language) currentLang = data.language;
         render();
       }
     } catch (e) {
-      // Graceful fallback
+      // Preserves local defaults
     }
   }
 
-  async function saveAccessibilityPreferences(updates) {
-    Object.assign({ simpleMode, textSize, textDirection, highContrast, currentLang }, updates);
+  async function updateAccessibilityPreferences(patchData) {
+    // Apply locally first for immediate responsiveness
+    if ('language' in patchData) currentLang = patchData.language;
+    if ('simple_mode' in patchData) simpleMode = patchData.simple_mode;
+    if ('text_size' in patchData) textSize = patchData.text_size;
+    if ('voice_enabled' in patchData) voiceEnabled = patchData.voice_enabled;
+    if ('right_to_left' in patchData) isRtl = patchData.right_to_left;
+    if ('high_contrast' in patchData) highContrast = patchData.high_contrast;
+
     render();
 
+    // Persist to backend if session exists
     if (!sessionId) return;
     try {
       await fetch(`${API_BASE}/api/v1/accessibility/preferences/${sessionId}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(patchData)
       });
     } catch (e) {
-      // Preferences remain in client state
+      // Local state maintained
     }
   }
 
@@ -710,21 +836,17 @@
     if (!content || !content.trim()) return;
 
     const trimmed = content.trim();
-    // Add local learner message
-    const learnerMsg = {
+    messages.push({
       sender_type: 'learner',
       content: trimmed,
       language: currentLang
-    };
-    messages.push(learnerMsg);
+    });
     isLoading = true;
     render();
     scrollMessagesToBottom();
 
     try {
-      if (!sessionId) {
-        await initSession();
-      }
+      if (!sessionId) await initSession();
 
       const res = await fetch(`${API_BASE}/api/v1/chat/sessions/${sessionId}/messages/`, {
         method: 'POST',
@@ -737,19 +859,17 @@
         messages.push(data.assistant_message);
         announce(`${t('liveNewMessagePrefix')} ${t('title')}: ${data.assistant_message.content}`);
       } else {
-        const errorMsg = {
+        messages.push({
           sender_type: 'assistant',
           content: t('errorNetwork')
-        };
-        messages.push(errorMsg);
+        });
         announce(t('errorNetwork'));
       }
     } catch (err) {
-      const fallbackMsg = {
+      messages.push({
         sender_type: 'assistant',
         content: t('errorNetwork')
-      };
-      messages.push(fallbackMsg);
+      });
       announce(t('errorNetwork'));
     } finally {
       isLoading = false;
@@ -813,39 +933,47 @@
 
   function bindEvents() {
     const launcher = document.getElementById('db-launcher-btn');
-    if (launcher) {
-      launcher.onclick = () => toggleWidget(true);
-    }
+    if (launcher) launcher.onclick = () => toggleWidget(true);
 
     const closeBtn = document.getElementById('db-btn-close');
-    if (closeBtn) {
-      closeBtn.onclick = () => toggleWidget(false);
+    if (closeBtn) closeBtn.onclick = () => toggleWidget(false);
+
+    const settingsBtn = document.getElementById('db-btn-settings');
+    if (settingsBtn) {
+      settingsBtn.onclick = () => {
+        viewMode = viewMode === 'settings' ? 'chat' : 'settings';
+        render();
+      };
     }
 
-    const langBtn = document.getElementById('db-btn-lang');
-    if (langBtn) {
-      langBtn.onclick = () => {
+    const doneSettingsBtn = document.getElementById('db-btn-done-settings');
+    if (doneSettingsBtn) {
+      doneSettingsBtn.onclick = () => {
+        viewMode = 'chat';
+        render();
+      };
+    }
+
+    const quickLangBtn = document.getElementById('db-btn-quick-lang');
+    if (quickLangBtn) {
+      quickLangBtn.onclick = () => {
         const nextLang = currentLang === 'en' ? 'am' : 'en';
-        saveAccessibilityPreferences({ preferred_language: nextLang });
+        updateAccessibilityPreferences({ language: nextLang });
       };
     }
 
     const simpleBtn = document.getElementById('db-btn-simple');
     if (simpleBtn) {
       simpleBtn.onclick = () => {
-        saveAccessibilityPreferences({ simple_mode: !simpleMode });
+        updateAccessibilityPreferences({ simple_mode: !simpleMode });
       };
     }
 
     const humanBtn = document.getElementById('db-btn-human');
-    if (humanBtn) {
-      humanBtn.onclick = handleHumanEscalation;
-    }
+    if (humanBtn) humanBtn.onclick = handleHumanEscalation;
 
     const micBtn = document.getElementById('db-btn-mic');
-    if (micBtn) {
-      micBtn.onclick = handleVoiceInput;
-    }
+    if (micBtn) micBtn.onclick = handleVoiceInput;
 
     const form = document.getElementById('db-input-form');
     if (form) {
@@ -859,12 +987,35 @@
       };
     }
 
-    const settingsBtn = document.getElementById('db-btn-settings');
-    if (settingsBtn) {
-      settingsBtn.onclick = () => {
-        const nextSize = textSize === 'normal' ? 'large' : (textSize === 'large' ? 'xlarge' : 'normal');
-        saveAccessibilityPreferences({ text_size: nextSize, high_contrast: !highContrast });
-      };
+    // Settings input change handlers
+    const setLang = document.getElementById('db-set-lang');
+    if (setLang) {
+      setLang.onchange = (e) => updateAccessibilityPreferences({ language: e.target.value });
+    }
+
+    const setSize = document.getElementById('db-set-size');
+    if (setSize) {
+      setSize.onchange = (e) => updateAccessibilityPreferences({ text_size: e.target.value });
+    }
+
+    const setSimple = document.getElementById('db-set-simple');
+    if (setSimple) {
+      setSimple.onchange = (e) => updateAccessibilityPreferences({ simple_mode: e.target.checked });
+    }
+
+    const setContrast = document.getElementById('db-set-contrast');
+    if (setContrast) {
+      setContrast.onchange = (e) => updateAccessibilityPreferences({ high_contrast: e.target.checked });
+    }
+
+    const setRtl = document.getElementById('db-set-rtl');
+    if (setRtl) {
+      setRtl.onchange = (e) => updateAccessibilityPreferences({ right_to_left: e.target.checked });
+    }
+
+    const setVoice = document.getElementById('db-set-voice');
+    if (setVoice) {
+      setVoice.onchange = (e) => updateAccessibilityPreferences({ voice_enabled: e.target.checked });
     }
 
     // Keyboard support: Close on Escape
@@ -883,4 +1034,3 @@
   }
 
 })();
-

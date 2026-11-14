@@ -49,4 +49,3 @@ class AccessibilityPreferenceDetailView(APIView):
             session.save(update_fields=['preferred_language'])
 
         return Response(AccessibilityPreferenceSerializer(updated_pref).data, status=status.HTTP_200_OK)
-
