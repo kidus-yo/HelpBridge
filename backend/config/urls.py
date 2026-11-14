@@ -19,10 +19,8 @@ urlpatterns = [
     # Modular API routes
     path('api/v1/ai/', include('ai_engine.urls')),
     path('api/v1/channels/', include('channels.urls')),
-    path('api/v1/support/', include('support.urls')),
-    path('api/v1/jobs/', include('careers.urls')),
-    path('api/v1/accommodations/', include((accommodation_urlpatterns, 'accommodations'))),
-    path('api/v1/job-alerts/', include((job_alert_urlpatterns, 'job-alerts'))),
+    path('api/v1/chat/', include('chat.urls')),
+    path('api/v1/accessibility/', include('accessibility.urls')),
 
     # Track 3 requirement: Direct /sms/inbound route
     path('sms/inbound', sms_inbound_view, name='direct-sms-inbound'),
