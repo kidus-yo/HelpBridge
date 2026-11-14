@@ -9,7 +9,8 @@ import os
 import json
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
+from uuid import UUID
 
 DATA_DIR = Path(__file__).resolve().parent.parent / 'ai_engine' / 'data'
 SECTIONS_FILE = DATA_DIR / 'default_course_sections.json'
@@ -198,3 +199,30 @@ class MockChatService:
         else:
             cls._messages[session_id] = [msg]
         return msg
+
+
+def search_course_content(
+    institution_id: Union[str, UUID],
+    query: str,
+    course_id: Union[str, UUID, None] = None,
+    language: Optional[str] = None,
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    """Kidus's knowledge retrieval contract for the AI / chat teams.
+
+    Implementation lives in knowledge.services.retrieval. This wrapper is the
+    stable import path other developers can use without depending on parsers
+    or embedding internals.
+
+    Returns an empty list when nothing relevant is found. Never fabricates
+    citations. Tenant isolation is enforced by institution_id at query time.
+    """
+    from knowledge.services.retrieval import search_course_content as _search
+
+    return _search(
+        institution_id=institution_id,
+        query=query,
+        course_id=course_id,
+        language=language,
+        limit=limit,
+    )

@@ -1,150 +1,179 @@
 """
-Django settings for Digital Bridge project.
+Django settings for HelpBridge / Digital Bridge.
 ALX Digital Bridge Accessibility Hackathon 2026 - Track 3
 """
 
 import os
+import sys
 from pathlib import Path
+
+import environ
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = BASE_DIR.parent
 
-# Load environment variables from .env if present
-load_dotenv(BASE_DIR.parent / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
-SECRET_KEY = os.getenv(
-    'SECRET_KEY',
-    'django-insecure-digital-bridge-hackathon-2026-demo-key'
+env = environ.Env(
+    DEBUG=(bool, True),
+    DJANGO_ENV=(str, "development"),
 )
+if (ROOT_DIR / ".env").exists():
+    environ.Env.read_env(str(ROOT_DIR / ".env"))
 
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+DJANGO_ENV = env("DJANGO_ENV", default="development")
+TESTING = "test" in sys.argv or "pytest" in sys.modules or env.bool("PYTEST_RUNNING", default=False)
+
+SECRET_KEY = env("SECRET_KEY", default="django-insecure-digital-bridge-hackathon-2026-demo-key")
+DEBUG = env.bool("DEBUG", default=True)
+if DJANGO_ENV == "production" and SECRET_KEY.startswith("django-insecure-"):
+    raise ImproperlyConfigured("Set a non-default SECRET_KEY in production.")
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0,*').split(',')
+    for host in env("ALLOWED_HOSTS", default="localhost,127.0.0.1,0.0.0.0,*").split(",")
     if host.strip()
 ]
 
-# Application definition
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    # Third-party
-    'rest_framework',
-    'drf_spectacular',
-    # Project Apps
-    'common.apps.CommonConfig',
-    'ai_engine.apps.AiEngineConfig',
-    'channels.apps.ChannelsConfig',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "drf_spectacular",
+    "common.apps.CommonConfig",
+    "platforms.apps.PlatformsConfig",
+    "courses.apps.CoursesConfig",
+    "knowledge.apps.KnowledgeConfig",
+    "ai_engine.apps.AiEngineConfig",
+    "channels.apps.ChannelsConfig",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
-ASGI_APPLICATION = 'config.asgi.application'
+WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
 
-# Database
-# Default to SQLite for easy local development / judging; PostgreSQL if configured
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = env("DATABASE_URL", default="")
+if DATABASE_URL:
+    DATABASES = {"default": env.db("DATABASE_URL")}
+elif DJANGO_ENV == "production" and not TESTING:
+    raise ImproperlyConfigured(
+        "DATABASE_URL is required when DJANGO_ENV=production. "
+        "PostgreSQL is required; SQLite is not used in production."
+    )
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Internationalization
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Django REST Framework Settings
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
     ],
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-        'rest_framework.parsers.FormParser',
-        'rest_framework.parsers.MultiPartParser',
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
     ],
 }
 
-# DRF Spectacular OpenAPI documentation settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Digital Bridge Assistant API',
-    'DESCRIPTION': (
-        'Level 2 REST API for Digital Bridge Assistant (Track 3: Multilingual Assistant & Live Help). '
-        'Provides retrieval-grounded course Q&A in English and Amharic, offline FAQ fallback, '
-        'Telegram bot webhook, and 160-char low-bandwidth SMS delivery adapter.'
+    "TITLE": "HelpBridge / Digital Bridge Assistant API",
+    "DESCRIPTION": (
+        "Level 2 REST API for Track 3: Multilingual Assistant & Live Help. "
+        "Includes institution/platform tenancy, course structure, document processing, "
+        "knowledge retrieval, retrieval-grounded Q&A, Telegram, and SMS adapters."
     ),
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'COMPONENT_SPLIT_REQUEST': True,
+    "VERSION": "1.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
-# AI Engine Configuration
-AI_PROVIDER = os.getenv('AI_PROVIDER', 'offline')  # offline, cloud, local, mock
-AI_CLOUD_PROVIDER = os.getenv('AI_CLOUD_PROVIDER', 'openai')
-AI_CLOUD_API_KEY = os.getenv('AI_CLOUD_API_KEY', '')
-AI_CLOUD_MODEL = os.getenv('AI_CLOUD_MODEL', 'gpt-4o-mini')
-AI_LOCAL_ENDPOINT = os.getenv('AI_LOCAL_ENDPOINT', 'http://localhost:11434/v1')
-AI_LOCAL_MODEL = os.getenv('AI_LOCAL_MODEL', 'llama3')
-AI_GROUNDING_THRESHOLD = float(os.getenv('AI_GROUNDING_THRESHOLD', '0.20'))
+AI_PROVIDER = env("AI_PROVIDER", default="offline")
+AI_CLOUD_PROVIDER = env("AI_CLOUD_PROVIDER", default="openai")
+AI_CLOUD_API_KEY = env("AI_CLOUD_API_KEY", default="")
+AI_CLOUD_MODEL = env("AI_CLOUD_MODEL", default="gpt-4o-mini")
+AI_LOCAL_ENDPOINT = env("AI_LOCAL_ENDPOINT", default="http://localhost:11434/v1")
+AI_LOCAL_MODEL = env("AI_LOCAL_MODEL", default="llama3")
+AI_GROUNDING_THRESHOLD = env.float("AI_GROUNDING_THRESHOLD", default=0.20)
 
-# Channels Configuration
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
-TELEGRAM_WEBHOOK_SECRET = os.getenv('TELEGRAM_WEBHOOK_SECRET', '')
-TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'DigitalBridgeAssistantBot')
+TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
+TELEGRAM_WEBHOOK_SECRET = env("TELEGRAM_WEBHOOK_SECRET", default="")
+TELEGRAM_BOT_USERNAME = env("TELEGRAM_BOT_USERNAME", default="DigitalBridgeAssistantBot")
 
-SMS_GATEWAY_API_KEY = os.getenv('SMS_GATEWAY_API_KEY', '')
-SMS_DEFAULT_SENDER = os.getenv('SMS_DEFAULT_SENDER', '+251911000000')
+SMS_GATEWAY_API_KEY = env("SMS_GATEWAY_API_KEY", default="")
+SMS_DEFAULT_SENDER = env("SMS_DEFAULT_SENDER", default="+251911000000")
 
-DEFAULT_LANGUAGE = os.getenv('DEFAULT_LANGUAGE', 'am')
+DEFAULT_LANGUAGE = env("DEFAULT_LANGUAGE", default="am")
+
+PLATFORM_CONTEXT_SIGNING_KEY = env("PLATFORM_CONTEXT_SIGNING_KEY", default=SECRET_KEY)
+PLATFORM_CONTEXT_TTL_SECONDS = env.int("PLATFORM_CONTEXT_TTL_SECONDS", default=900)
+DOCUMENT_MAX_UPLOAD_MB = env.int("DOCUMENT_MAX_UPLOAD_MB", default=10)
+DOCUMENT_STORAGE_BACKEND = env("DOCUMENT_STORAGE_BACKEND", default="local")
+EMBEDDING_PROVIDER = env("EMBEDDING_PROVIDER", default="hash")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "knowledge": {"handlers": ["console"], "level": "INFO"},
+        "platforms": {"handlers": ["console"], "level": "INFO"},
+    },
+}
