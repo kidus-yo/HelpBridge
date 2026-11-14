@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'common.apps.CommonConfig',
     'ai_engine.apps.AiEngineConfig',
     'channels.apps.ChannelsConfig',
+    'chat.apps.ChatConfig',
+    'accessibility.apps.AccessibilityConfig',
 ]
 
 MIDDLEWARE = [
