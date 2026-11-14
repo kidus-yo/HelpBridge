@@ -1,27 +1,60 @@
+
 """
-URL configuration for Digital Bridge project.
+URL Configuration for HelpBridge.
 """
 
 from django.contrib import admin
-from django.urls import path, include
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from django.urls import include, path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
+
 from channels.views import sms_inbound_view
-from careers.urls import accommodation_urlpatterns, job_alert_urlpatterns
+from common.views import HealthView
+
+from careers.urls import (
+    accommodation_urlpatterns,
+    job_alert_urlpatterns,
+)
+
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Django admin
+    path("admin/", admin.site.urls),
 
-    # OpenAPI 3 Documentation (Level 2 Integration)
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    # API documentation
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 
-    # Modular API routes
-    path('api/v1/ai/', include('ai_engine.urls')),
-    path('api/v1/channels/', include('channels.urls')),
-    path('api/v1/chat/', include('chat.urls')),
-    path('api/v1/accessibility/', include('accessibility.urls')),
+    # Health check
+    path("api/v1/health/", HealthView.as_view(), name="health"),
 
-    # Track 3 requirement: Direct /sms/inbound route
-    path('sms/inbound', sms_inbound_view, name='direct-sms-inbound'),
+    # Your platform foundation
+    path("api/v1/", include("platforms.urls")),
+    path("api/v1/", include("courses.urls")),
+    path("api/v1/", include("knowledge.urls")),
+
+    # AI and communication
+    path("api/v1/ai/", include("ai_engine.urls")),
+    path("api/v1/channels/", include("channels.urls")),
+    path("sms/inbound", sms_inbound_view, name="direct-sms-inbound"),
+
+    # Koket's chat and accessibility
+    path("api/v1/chat/", include("chat.urls")),
+    path("api/v1/accessibility/", include("accessibility.urls")),
+
+    # Yensew's support and career features
+    path("api/v1/support/", include("support.urls")),
+    path("api/v1/jobs/", include("careers.urls")),
+    path(
+        "api/v1/accommodations/",
+        include((accommodation_urlpatterns, "accommodations")),
+    ),
+    path(
+        "api/v1/job-alerts/",
+        include((job_alert_urlpatterns, "job-alerts")),
+    ),
 ]
