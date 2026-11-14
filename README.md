@@ -1,17 +1,22 @@
-# Digital Bridge Assistant — AI Engine & Communication Channels
+# Digital Bridge Assistant
 **ALX Digital Bridge Accessibility Hackathon 2026 — Track 3: Multilingual Assistant and Live Help**  
-**Component Owner:** Samuel (Developer 3) — AI Integration & Channels Engineer  
-**Lead & Knowledge Base:** Kidus | **Widget & Chat Sessions:** Koket | **Support & Careers:** Yensew  
+**Lead & Knowledge Base:** Kidus | **Widget & Chat Sessions:** Koket | **AI Engine & Channels:** Samuel | **Support & Careers:** Yensew  
 
 ---
 
 ## What It Does
-Digital Bridge Assistant is a lightweight, accessible learner-support plugin for existing learning management platforms, starting with ALX Savanna. It provides evidence-grounded course tutoring in Amharic and English, citing actual lesson sections and refusing to hallucinate when evidence is missing. It unifies web widget, Telegram bot, and low-bandwidth SMS channels onto a single central Django intelligence backend with offline keyword and curated FAQ fallbacks.
+Digital Bridge Assistant is a lightweight, accessible learner-support plugin for existing learning management platforms, starting with ALX Savanna. It provides:
+1. **Evidence-grounded course tutoring** in Amharic and English, citing actual lesson sections and refusing to hallucinate when evidence is missing.
+2. **Unified communication channels:** Web widget, Telegram bot, and low-bandwidth SMS on a single central Django intelligence backend with offline keyword and curated FAQ fallbacks.
+3. **One-click human escalation & live help:** Learner-controlled handoff to human support agents with explicit chat consent boundaries, learner-controlled screen sharing, and low-bandwidth screen snapshot fallback.
+4. **Career Gateway & Accommodations:** Search and grounded Q&A for job opportunities, interview accommodation requests requiring **zero medical diagnoses**, and outbound job alert notifications via Telegram and 160-char SMS.
 
 ---
 
-## The Main Task We Tested
+## The Main Tasks We Tested
 > *"A blind or low-connectivity learner asks a course question in Amharic or English via Telegram or low-bandwidth SMS, receives an evidence-grounded answer citing the exact lesson section, and has an immediate route to human escalation if the material cannot verify the answer."*
+>
+> *"A learner encounters an accessibility barrier or complex problem on a Savanna course page, escalates to a human agent with one click, controls screen sharing with a persistent stop control, and discovers accessible job opportunities with private interview accommodations."*
 
 ---
 
@@ -20,7 +25,7 @@ Digital Bridge Assistant is a lightweight, accessible learner-support plugin for
 ### Option A: Local Development Environment
 ```bash
 # 1. Clone & switch to feature branch
-git checkout feature/samuel-ai-channels
+git checkout feature/yensew-support-careers
 
 # 2. Activate virtual environment
 source .venv/bin/activate
@@ -28,10 +33,13 @@ source .venv/bin/activate
 # 3. Apply migrations
 python backend/manage.py migrate
 
-# 4. Run automated tests (23 unit & integration tests)
+# 4. Seed demo data (Support tickets, Ethiopian jobs, accommodations, subscriptions)
+python backend/manage.py seed_careers_and_support
+
+# 5. Run automated tests (45 unit & integration tests)
 pytest
 
-# 5. Start the backend development server
+# 6. Start the backend development server
 python backend/manage.py runserver 0.0.0.0:8000
 ```
 - Interactive Swagger UI: [http://localhost:8000/docs/](http://localhost:8000/docs/)

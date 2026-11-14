@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from channels.views import sms_inbound_view
+from careers.urls import accommodation_urlpatterns, job_alert_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),

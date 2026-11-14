@@ -7,6 +7,153 @@ info:
     Amharic, offline FAQ fallback, Telegram bot webhook, and 160-char low-bandwidth
     SMS delivery adapter.'
 paths:
+  /api/v1/accommodations/:
+    get:
+      operationId: api_v1_accommodations_list
+      description: |-
+        Submit an interview accommodation request (privacy-preserving, functional adjustments only),
+        or list submitted requests for the learner/guest or staff.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccommodationRequest'
+          description: ''
+    post:
+      operationId: api_v1_accommodations_create
+      description: |-
+        Submit an interview accommodation request (privacy-preserving, functional adjustments only),
+        or list submitted requests for the learner/guest or staff.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccommodationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AccommodationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AccommodationRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccommodationRequest'
+          description: ''
+  /api/v1/accommodations/{id}/:
+    get:
+      operationId: api_v1_accommodations_retrieve
+      description: |-
+        View status of accommodation request (learner/guest or staff),
+        or update/respond (staff only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccommodationRequest'
+          description: ''
+    put:
+      operationId: api_v1_accommodations_update
+      description: |-
+        View status of accommodation request (learner/guest or staff),
+        or update/respond (staff only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccommodationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AccommodationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AccommodationRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccommodationRequest'
+          description: ''
+    patch:
+      operationId: api_v1_accommodations_partial_update
+      description: |-
+        View status of accommodation request (learner/guest or staff),
+        or update/respond (staff only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAccommodationRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAccommodationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAccommodationRequestRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccommodationRequest'
+          description: ''
   /api/v1/ai/answer/:
     post:
       operationId: api_v1_ai_answer_create
@@ -189,6 +336,587 @@ paths:
       responses:
         '200':
           description: Update received and processed successfully
+  /api/v1/job-alerts/subscriptions/:
+    get:
+      operationId: api_v1_job_alerts_subscriptions_list
+      description: Subscribe to job alert notifications via Telegram or low-bandwidth
+        SMS.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobAlertSubscription'
+          description: ''
+    post:
+      operationId: api_v1_job_alerts_subscriptions_create
+      description: Subscribe to job alert notifications via Telegram or low-bandwidth
+        SMS.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobAlertSubscriptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JobAlertSubscriptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JobAlertSubscriptionRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAlertSubscription'
+          description: ''
+  /api/v1/job-alerts/subscriptions/{id}/:
+    get:
+      operationId: api_v1_job_alerts_subscriptions_retrieve
+      description: Retrieve, update keywords/status, or unsubscribe from job alerts.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAlertSubscription'
+          description: ''
+    put:
+      operationId: api_v1_job_alerts_subscriptions_update
+      description: Retrieve, update keywords/status, or unsubscribe from job alerts.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobAlertSubscriptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JobAlertSubscriptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JobAlertSubscriptionRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAlertSubscription'
+          description: ''
+    patch:
+      operationId: api_v1_job_alerts_subscriptions_partial_update
+      description: Retrieve, update keywords/status, or unsubscribe from job alerts.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedJobAlertSubscriptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedJobAlertSubscriptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedJobAlertSubscriptionRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAlertSubscription'
+          description: ''
+    delete:
+      operationId: api_v1_job_alerts_subscriptions_destroy
+      description: Retrieve, update keywords/status, or unsubscribe from job alerts.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/jobs/:
+    get:
+      operationId: api_v1_jobs_list
+      description: |-
+        List published job opportunities for learners (with search/filtering),
+        or create a new job listing (staff/admin only).
+      summary: List published jobs
+      parameters:
+      - in: query
+        name: employment_type
+        schema:
+          type: string
+        description: Filter by full_time, part_time, internship, contract
+      - in: query
+        name: location
+        schema:
+          type: string
+        description: Filter by location (e.g. Addis Ababa)
+      - in: query
+        name: remote_policy
+        schema:
+          type: string
+        description: Filter by remote, hybrid, on_site
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search keyword in title, organization, description
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobListing'
+          description: ''
+    post:
+      operationId: api_v1_jobs_create
+      description: |-
+        List published job opportunities for learners (with search/filtering),
+        or create a new job listing (staff/admin only).
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListing'
+          description: ''
+  /api/v1/jobs/{id}/:
+    get:
+      operationId: api_v1_jobs_retrieve
+      description: |-
+        Retrieve job details (learners only view published),
+        or update/publish/close job listing (staff only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListing'
+          description: ''
+    put:
+      operationId: api_v1_jobs_update
+      description: |-
+        Retrieve job details (learners only view published),
+        or update/publish/close job listing (staff only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListing'
+          description: ''
+    patch:
+      operationId: api_v1_jobs_partial_update
+      description: |-
+        Retrieve job details (learners only view published),
+        or update/publish/close job listing (staff only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListing'
+          description: ''
+    delete:
+      operationId: api_v1_jobs_destroy
+      description: |-
+        Retrieve job details (learners only view published),
+        or update/publish/close job listing (staff only).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/jobs/questions/:
+    post:
+      operationId: api_v1_jobs_questions_create
+      description: Answers questions about published job details without hallucinating
+        omitted fields.
+      summary: Grounded Job Q&A
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobQuestionRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JobQuestionRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JobQuestionRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobQuestionResponse'
+          description: ''
+  /api/v1/support/requests/:
+    get:
+      operationId: api_v1_support_requests_list
+      description: |-
+        List support tickets (filtered to requester or all for agents),
+        or create a new ticket with one-click escalation and optional chat consent.
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SupportRequestList'
+          description: ''
+    post:
+      operationId: api_v1_support_requests_create
+      description: |-
+        List support tickets (filtered to requester or all for agents),
+        or create a new ticket with one-click escalation and optional chat consent.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportRequestCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SupportRequestCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SupportRequestCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportRequestCreate'
+          description: ''
+  /api/v1/support/requests/{id}/:
+    get:
+      operationId: api_v1_support_requests_retrieve
+      description: Retrieve ticket details, message history, and accessibility status
+        announcements.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportRequestDetail'
+          description: ''
+  /api/v1/support/requests/{id}/messages/:
+    get:
+      operationId: api_v1_support_requests_messages_list
+      description: List messages or post a message in a support ticket thread.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SupportMessage'
+          description: ''
+    post:
+      operationId: api_v1_support_requests_messages_create
+      description: List messages or post a message in a support ticket thread.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SupportMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SupportMessageRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportMessage'
+          description: ''
+  /api/v1/support/requests/{id}/screenshare/:
+    post:
+      operationId: api_v1_support_requests_screenshare_create
+      description: |-
+        Learner-controlled screen sharing initiation and termination.
+        Strictly learner-initiated.
+      summary: Control screen sharing session (start/stop)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenShareControlRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ScreenShareControlRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ScreenShareControlRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: Screen share status details
+  /api/v1/support/requests/{id}/snapshot/:
+    post:
+      operationId: api_v1_support_requests_snapshot_create
+      description: 'Low-bandwidth fallback: Sends a static DOM / screenshot snapshot
+        to the support agent.'
+      summary: Send screen snapshot (low-bandwidth mode)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenSnapshotRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ScreenSnapshotRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ScreenSnapshotRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportMessage'
+          description: ''
+  /api/v1/support/requests/{id}/status/:
+    patch:
+      operationId: api_v1_support_requests_status_partial_update
+      description: Update support ticket status or assign agent (support agent or
+        staff only).
+      summary: Update support ticket status or assign agent
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSupportRequestStatusUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSupportRequestStatusUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSupportRequestStatusUpdateRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportRequestDetail'
+          description: ''
   /sms/inbound:
     get:
       operationId: sms_inbound_retrieve
@@ -262,6 +990,108 @@ components:
       - grounding_threshold
       - supported_languages
       - supported_providers
+    AccommodationRequest:
+      type: object
+      description: |-
+        Privacy-First accommodation request serializer.
+        Focuses solely on functional adjustments without requesting medical diagnosis.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        job_listing:
+          type: string
+          format: uuid
+          nullable: true
+        job_title:
+          type: string
+          readOnly: true
+        functional_needs:
+          description: Functional adjustments required (e.g. screen reader compatible
+            environment, extra time, captions)
+        description:
+          type: string
+          description: Specific functional requests or setup requirements.
+        preferred_contact_method:
+          $ref: '#/components/schemas/PreferredContactMethodEnum'
+        contact_details:
+          type: string
+          maxLength: 255
+        status:
+          allOf:
+          - $ref: '#/components/schemas/AccommodationStatusEnum'
+          readOnly: true
+        coordinator_response:
+          type: string
+          readOnly: true
+        guest_token:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - contact_details
+      - coordinator_response
+      - created_at
+      - description
+      - guest_token
+      - id
+      - job_title
+      - status
+      - updated_at
+    AccommodationRequestRequest:
+      type: object
+      description: |-
+        Privacy-First accommodation request serializer.
+        Focuses solely on functional adjustments without requesting medical diagnosis.
+      properties:
+        job_listing:
+          type: string
+          format: uuid
+          nullable: true
+        functional_needs:
+          description: Functional adjustments required (e.g. screen reader compatible
+            environment, extra time, captions)
+        description:
+          type: string
+          minLength: 1
+          description: Specific functional requests or setup requirements.
+        preferred_contact_method:
+          $ref: '#/components/schemas/PreferredContactMethodEnum'
+        contact_details:
+          type: string
+          minLength: 1
+          maxLength: 255
+      required:
+      - contact_details
+      - description
+    AccommodationStatusEnum:
+      enum:
+      - submitted
+      - reviewing
+      - responded
+      - closed
+      type: string
+      description: |-
+        * `submitted` - Submitted
+        * `reviewing` - Reviewing
+        * `responded` - Responded / Accommodations Arranged
+        * `closed` - Closed
+    ActionEnum:
+      enum:
+      - start
+      - stop
+      type: string
+      description: |-
+        * `start` - start
+        * `stop` - stop
     AnswerRequestRequest:
       type: object
       properties:
@@ -320,6 +1150,20 @@ components:
       - grounded
       - language
       - provider
+    CategoryEnum:
+      enum:
+      - course
+      - technical
+      - accessibility
+      - career
+      - other
+      type: string
+      description: |-
+        * `course` - Course Content Help
+        * `technical` - Platform & Tech Issue
+        * `accessibility` - Accessibility & Assistive Tech Issue
+        * `career` - Career & Job Support
+        * `other` - General Inquiry
     Citation:
       type: object
       properties:
@@ -342,6 +1186,222 @@ components:
       required:
       - document_title
       - section
+    EmploymentTypeEnum:
+      enum:
+      - full_time
+      - part_time
+      - internship
+      - contract
+      type: string
+      description: |-
+        * `full_time` - Full Time
+        * `part_time` - Part Time
+        * `internship` - Internship
+        * `contract` - Contract / Freelance
+    JobAlertSubscription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        contact_identity:
+          type: string
+          description: 'Verified destination: Telegram Chat ID or Phone number for
+            SMS.'
+          maxLength: 255
+        channel:
+          $ref: '#/components/schemas/JobAlertSubscriptionChannelEnum'
+        keywords:
+          description: Search keywords / skill tags for job matching.
+        location_preference:
+          type: string
+          maxLength: 255
+        is_active:
+          type: boolean
+        guest_token:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - contact_identity
+      - created_at
+      - guest_token
+      - id
+      - updated_at
+    JobAlertSubscriptionChannelEnum:
+      enum:
+      - telegram
+      - sms
+      type: string
+      description: |-
+        * `telegram` - Telegram
+        * `sms` - SMS
+    JobAlertSubscriptionRequest:
+      type: object
+      properties:
+        contact_identity:
+          type: string
+          minLength: 1
+          description: 'Verified destination: Telegram Chat ID or Phone number for
+            SMS.'
+          maxLength: 255
+        channel:
+          $ref: '#/components/schemas/JobAlertSubscriptionChannelEnum'
+        keywords:
+          description: Search keywords / skill tags for job matching.
+        location_preference:
+          type: string
+          maxLength: 255
+        is_active:
+          type: boolean
+      required:
+      - contact_identity
+    JobListing:
+      type: object
+      description: Public representation of published job listings.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        organization:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        location:
+          type: string
+          readOnly: true
+        employment_type:
+          allOf:
+          - $ref: '#/components/schemas/EmploymentTypeEnum'
+          readOnly: true
+        employment_type_display:
+          type: string
+          readOnly: true
+        remote_policy:
+          allOf:
+          - $ref: '#/components/schemas/RemotePolicyEnum'
+          readOnly: true
+        remote_policy_display:
+          type: string
+          readOnly: true
+        application_url:
+          type: string
+          format: uri
+          readOnly: true
+        contact_instructions:
+          type: string
+          readOnly: true
+        required_skills:
+          readOnly: true
+        salary_info:
+          type: string
+          readOnly: true
+          description: Published salary if provided.
+        deadline:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        source_url:
+          type: string
+          format: uri
+          readOnly: true
+        is_demo:
+          type: boolean
+          readOnly: true
+          description: Flags demo/sample hackathon postings transparently.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - application_url
+      - contact_instructions
+      - created_at
+      - deadline
+      - description
+      - employment_type
+      - employment_type_display
+      - id
+      - is_demo
+      - location
+      - organization
+      - remote_policy
+      - remote_policy_display
+      - required_skills
+      - salary_info
+      - source_url
+      - title
+      - updated_at
+    JobQuestionRequestRequest:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        question:
+          type: string
+          minLength: 1
+          maxLength: 500
+        language:
+          type: string
+          minLength: 1
+          default: en
+          maxLength: 10
+      required:
+      - job_id
+      - question
+    JobQuestionResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        job_title:
+          type: string
+        organization:
+          type: string
+        question:
+          type: string
+        answer:
+          type: string
+        grounded:
+          type: boolean
+        field_referenced:
+          type: string
+          nullable: true
+        language:
+          type: string
+        source:
+          type: string
+      required:
+      - answer
+      - field_referenced
+      - grounded
+      - job_id
+      - job_title
+      - language
+      - organization
+      - question
+      - source
     LanguageEnum:
       enum:
       - en
@@ -367,7 +1427,7 @@ components:
           type: string
           description: Message text delivered
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/MessageDeliveryStatusEnum'
         error_message:
           type: string
           nullable: true
@@ -395,6 +1455,18 @@ components:
         * `telegram` - Telegram
         * `sms` - SMS / Text
         * `web` - Web Widget
+    MessageDeliveryStatusEnum:
+      enum:
+      - pending
+      - sent
+      - delivered
+      - failed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `sent` - Sent
+        * `delivered` - Delivered
+        * `failed` - Failed
     NotificationSendChannelEnum:
       enum:
       - telegram
@@ -424,6 +1496,87 @@ components:
       required:
       - message
       - recipient
+    PatchedAccommodationRequestRequest:
+      type: object
+      description: |-
+        Privacy-First accommodation request serializer.
+        Focuses solely on functional adjustments without requesting medical diagnosis.
+      properties:
+        job_listing:
+          type: string
+          format: uuid
+          nullable: true
+        functional_needs:
+          description: Functional adjustments required (e.g. screen reader compatible
+            environment, extra time, captions)
+        description:
+          type: string
+          minLength: 1
+          description: Specific functional requests or setup requirements.
+        preferred_contact_method:
+          $ref: '#/components/schemas/PreferredContactMethodEnum'
+        contact_details:
+          type: string
+          minLength: 1
+          maxLength: 255
+    PatchedJobAlertSubscriptionRequest:
+      type: object
+      properties:
+        contact_identity:
+          type: string
+          minLength: 1
+          description: 'Verified destination: Telegram Chat ID or Phone number for
+            SMS.'
+          maxLength: 255
+        channel:
+          $ref: '#/components/schemas/JobAlertSubscriptionChannelEnum'
+        keywords:
+          description: Search keywords / skill tags for job matching.
+        location_preference:
+          type: string
+          maxLength: 255
+        is_active:
+          type: boolean
+    PatchedSupportRequestStatusUpdateRequest:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/SupportRequestStatusUpdateStatusEnum'
+        assign_to_me:
+          type: boolean
+          default: false
+    PreferredAssistanceModeEnum:
+      enum:
+      - chat
+      - screen_share
+      - low_bandwidth
+      type: string
+      description: |-
+        * `chat` - Text Chat Only (Default)
+        * `screen_share` - Screen Sharing Requested
+        * `low_bandwidth` - Low-Bandwidth / Async SMS/Telegram
+    PreferredContactMethodEnum:
+      enum:
+      - telegram
+      - sms
+      - email
+      type: string
+      description: |-
+        * `telegram` - Telegram
+        * `sms` - SMS
+        * `email` - Email
+    PriorityEnum:
+      enum:
+      - low
+      - normal
+      - high
+      - urgent
+      type: string
+      description: |-
+        * `low` - Low
+        * `normal` - Normal
+        * `high` - High
+        * `urgent` - Urgent
     ProviderEnum:
       enum:
       - offline
@@ -436,6 +1589,16 @@ components:
         * `cloud` - cloud
         * `local` - local
         * `mock` - mock
+    RemotePolicyEnum:
+      enum:
+      - remote
+      - hybrid
+      - on_site
+      type: string
+      description: |-
+        * `remote` - Fully Remote
+        * `hybrid` - Hybrid
+        * `on_site` - On-Site
     SMSInboundRequest:
       type: object
       description: |-
@@ -450,18 +1613,332 @@ components:
           type: string
           minLength: 1
           description: Message text content
-    StatusEnum:
+    ScreenShareControlRequest:
+      type: object
+      properties:
+        action:
+          $ref: '#/components/schemas/ActionEnum'
+      required:
+      - action
+    ScreenSnapshotRequest:
+      type: object
+      properties:
+        snapshot_data:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          default: ''
+      required:
+      - snapshot_data
+    SenderTypeEnum:
       enum:
-      - pending
-      - sent
-      - delivered
-      - failed
+      - learner
+      - agent
+      - system
       type: string
       description: |-
-        * `pending` - Pending
-        * `sent` - Sent
-        * `delivered` - Delivered
-        * `failed` - Failed
+        * `learner` - Learner
+        * `agent` - Agent
+        * `system` - System
+    Status164Enum:
+      enum:
+      - open
+      - assigned
+      - in_progress
+      - resolved
+      - closed
+      type: string
+      description: |-
+        * `open` - Open - Waiting for Agent
+        * `assigned` - Agent Assigned
+        * `in_progress` - In Conversation
+        * `resolved` - Resolved
+        * `closed` - Closed
+    SupportMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        support_request:
+          type: string
+          format: uuid
+          readOnly: true
+        sender_type:
+          allOf:
+          - $ref: '#/components/schemas/SenderTypeEnum'
+          readOnly: true
+        sender:
+          type: integer
+          readOnly: true
+          nullable: true
+        sender_username:
+          type: string
+          readOnly: true
+        content:
+          type: string
+        is_read:
+          type: boolean
+          readOnly: true
+        is_snapshot:
+          type: boolean
+        snapshot_data:
+          type: string
+          description: Plain text DOM snapshot or data URI image.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - content
+      - created_at
+      - id
+      - is_read
+      - sender
+      - sender_type
+      - sender_username
+      - support_request
+    SupportMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+        is_snapshot:
+          type: boolean
+        snapshot_data:
+          type: string
+          description: Plain text DOM snapshot or data URI image.
+      required:
+      - content
+    SupportRequestCreate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        institution_id:
+          type: string
+          format: uuid
+          nullable: true
+        chat_session_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Reference to Koket's chat session if escalated from automated
+            tutor.
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        subject:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        preferred_assistance_mode:
+          $ref: '#/components/schemas/PreferredAssistanceModeEnum'
+        language:
+          type: string
+          maxLength: 10
+        learner_consent_chat_history:
+          type: boolean
+          description: Explicit learner permission to let the agent review prior chat
+            messages.
+        guest_token:
+          type: string
+          readOnly: true
+          description: Token for unauthenticated LMS guest sessions to access their
+            own ticket.
+      required:
+      - description
+      - guest_token
+      - id
+      - subject
+    SupportRequestCreateRequest:
+      type: object
+      properties:
+        institution_id:
+          type: string
+          format: uuid
+          nullable: true
+        chat_session_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Reference to Koket's chat session if escalated from automated
+            tutor.
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        preferred_assistance_mode:
+          $ref: '#/components/schemas/PreferredAssistanceModeEnum'
+        language:
+          type: string
+          minLength: 1
+          maxLength: 10
+        learner_consent_chat_history:
+          type: boolean
+          description: Explicit learner permission to let the agent review prior chat
+            messages.
+      required:
+      - description
+      - subject
+    SupportRequestDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        institution_id:
+          type: string
+          format: uuid
+          nullable: true
+        chat_session_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Reference to Koket's chat session if escalated from automated
+            tutor.
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        subject:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        status:
+          $ref: '#/components/schemas/Status164Enum'
+        preferred_assistance_mode:
+          $ref: '#/components/schemas/PreferredAssistanceModeEnum'
+        language:
+          type: string
+          maxLength: 10
+        assigned_agent:
+          type: integer
+          nullable: true
+        assigned_agent_name:
+          type: string
+          readOnly: true
+        learner_consent_chat_history:
+          type: boolean
+          description: Explicit learner permission to let the agent review prior chat
+            messages.
+        screen_share_active:
+          type: boolean
+        guest_token:
+          type: string
+          description: Token for unauthenticated LMS guest sessions to access their
+            own ticket.
+          maxLength: 64
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupportMessage'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        accessibility_meta:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+      required:
+      - accessibility_meta
+      - assigned_agent_name
+      - created_at
+      - description
+      - id
+      - messages
+      - subject
+      - updated_at
+    SupportRequestList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        subject:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        status:
+          $ref: '#/components/schemas/Status164Enum'
+        preferred_assistance_mode:
+          $ref: '#/components/schemas/PreferredAssistanceModeEnum'
+        language:
+          type: string
+          maxLength: 10
+        assigned_agent:
+          type: integer
+          nullable: true
+        assigned_agent_name:
+          type: string
+          readOnly: true
+        learner_consent_chat_history:
+          type: boolean
+          description: Explicit learner permission to let the agent review prior chat
+            messages.
+        screen_share_active:
+          type: boolean
+        messages_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - assigned_agent_name
+      - created_at
+      - description
+      - id
+      - messages_count
+      - subject
+      - updated_at
+    SupportRequestStatusUpdateStatusEnum:
+      enum:
+      - open
+      - assigned
+      - in_progress
+      - resolved
+      - closed
+      type: string
+      description: |-
+        * `open` - open
+        * `assigned` - assigned
+        * `in_progress` - in_progress
+        * `resolved` - resolved
+        * `closed` - closed
     TelegramWebhookRequest:
       type: object
       properties:
