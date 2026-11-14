@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 class JobQAService:
     """
     Answers questions regarding a specific job listing strictly using verified, published fields.
+    Supports English and Amharic queries.
     Refuses missing information honestly without fabricating hiring details.
     """
 
@@ -22,75 +23,108 @@ class JobQAService:
             raise ValidationError({'question': 'Question cannot be empty.'})
 
         q_lower = question.lower().strip()
-        job_data = {
-            'title': job.title,
-            'organization': job.organization,
-            'location': job.location,
-            'employment_type': job.get_employment_type_display(),
-            'remote_policy': job.get_remote_policy_display(),
-            'description': job.description,
-            'salary': job.salary_info,
-            'deadline': str(job.deadline) if job.deadline else None,
-            'skills': job.required_skills,
-            'application_url': job.application_url,
-            'contact_instructions': job.contact_instructions,
-        }
+        is_amharic = (
+            language == 'am' or
+            any('\u1200' <= char <= '\u137f' for char in question)
+        )
 
-        # Check specific field queries
-        if any(term in q_lower for term in ['salary', 'pay', 'compensation', 'wage', 'stipend', 'rate']):
+        # 1. Salary Queries
+        salary_terms_en = ['salary', 'pay', 'compensation', 'wage', 'stipend', 'rate']
+        salary_terms_am = ['ደመወዝ', 'ደሞዝ', 'ክፍያ', 'ስንት ይከፍላል', 'አበል']
+        if any(term in q_lower for term in salary_terms_en) or any(term in question for term in salary_terms_am):
             if job.salary_info:
-                answer = f"The published salary for {job.title} at {job.organization} is {job.salary_info}."
+                if is_amharic:
+                    answer = f"ለ{job.title} በ{job.organization} የተገለጸው ደመወዝ {job.salary_info} ነው።"
+                else:
+                    answer = f"The published salary for {job.title} at {job.organization} is {job.salary_info}."
                 grounded = True
                 field = 'salary_info'
             else:
-                answer = (
-                    f"Salary information is not provided in the published details for {job.title} at {job.organization}. "
-                    "You may contact the employer directly or request interview accommodation."
-                )
+                if is_amharic:
+                    answer = (
+                        f"ለ{job.title} በ{job.organization} የወጣው የሥራ ማስታወቂያ ላይ ስለ ደመወዝ የተገለጸ መረጃ የለም። "
+                        "አሰሪውን በቀጥታ መጠየቅ ወይም የቃለ-መጠይቅ ማመቻቻ ጥያቄ ማቅረብ ይችላሉ።"
+                    )
+                else:
+                    answer = (
+                        f"Salary information is not provided in the published details for {job.title} at {job.organization}. "
+                        "You may contact the employer directly or request interview accommodation."
+                    )
                 grounded = False
                 field = None
 
-        elif any(term in q_lower for term in ['deadline', 'closing date', 'due date', 'last date', 'apply by']):
+        # 2. Deadline Queries
+        elif any(term in q_lower for term in ['deadline', 'closing date', 'due date', 'last date', 'apply by']) or any(term in question for term in ['የመጨረሻ ቀን', 'ማብቂያ', 'መቼ ያበቃል']):
             if job.deadline:
-                answer = f"The application deadline for {job.title} is {job.deadline.strftime('%B %d, %Y')}."
+                if is_amharic:
+                    answer = f"ለ{job.title} የማመልከቻው የመጨረሻ ቀን {job.deadline.strftime('%B %d, %Y')} ነው።"
+                else:
+                    answer = f"The application deadline for {job.title} is {job.deadline.strftime('%B %d, %Y')}."
                 grounded = True
                 field = 'deadline'
             else:
-                answer = f"No specific application deadline is provided in the published listing for {job.title}."
+                if is_amharic:
+                    answer = f"ለ{job.title} የተለየ የማመልከቻ ማብቂያ ቀን በማስታወቂያው ላይ አልተጠቀሰም።"
+                else:
+                    answer = f"No specific application deadline is provided in the published listing for {job.title}."
                 grounded = False
                 field = None
 
-        elif any(term in q_lower for term in ['remote', 'work from home', 'hybrid', 'on-site', 'onsite', 'location', 'where']):
-            answer = (
-                f"{job.title} at {job.organization} is located in {job.location}. "
-                f"Work arrangement: {job.get_remote_policy_display()} ({job.get_employment_type_display()})."
-            )
+        # 3. Location / Remote Queries
+        elif any(term in q_lower for term in ['remote', 'work from home', 'hybrid', 'on-site', 'onsite', 'location', 'where']) or any(term in question for term in ['ቦታ', 'የት', 'ከቤት', 'በሩቅ', 'አድራሻ']):
+            if is_amharic:
+                answer = (
+                    f"{job.title} በ{job.organization} የሚገኝበት ቦታ፡ {job.location}። "
+                    f"የሥራ ሁኔታ፡ {job.get_remote_policy_display()} ({job.get_employment_type_display()})።"
+                )
+            else:
+                answer = (
+                    f"{job.title} at {job.organization} is located in {job.location}. "
+                    f"Work arrangement: {job.get_remote_policy_display()} ({job.get_employment_type_display()})."
+                )
             grounded = True
             field = 'location'
 
-        elif any(term in q_lower for term in ['skill', 'requirement', 'qualif', 'prereq', 'technolog', 'stack']):
+        # 4. Skills & Requirements
+        elif any(term in q_lower for term in ['skill', 'requirement', 'qualif', 'prereq', 'technolog', 'stack']) or any(term in question for term in ['ችሎታ', 'መስፈርት', 'እውቀት', 'ምን ያስፈልጋል']):
             if job.required_skills:
                 skills_str = ', '.join(job.required_skills) if isinstance(job.required_skills, list) else str(job.required_skills)
-                answer = f"Required skills and qualifications for {job.title}: {skills_str}."
+                if is_amharic:
+                    answer = f"ለ{job.title} የሚያስፈልጉ ዋና ችሎታዎችና መስፈርቶች፡ {skills_str}።"
+                else:
+                    answer = f"Required skills and qualifications for {job.title}: {skills_str}."
                 grounded = True
                 field = 'required_skills'
             else:
-                answer = f"Detailed skill prerequisites are not listed separately; please check the job description: {job.description[:300]}..."
+                if is_amharic:
+                    answer = f"ዝርዝር መስፈርቶች ለብቻቸው አልተዘረዘሩም፤ እባክዎ ሙሉ የሥራውን መግለጫ ይመልከቱ፡ {job.description[:300]}..."
+                else:
+                    answer = f"Detailed skill prerequisites are not listed separately; please check the job description: {job.description[:300]}..."
                 grounded = True
                 field = 'description'
 
-        elif any(term in q_lower for term in ['how to apply', 'apply', 'contact', 'link', 'submit']):
+        # 5. How to Apply
+        elif any(term in q_lower for term in ['how to apply', 'apply', 'contact', 'link', 'submit']) or any(term in question for term in ['እንዴት ማመልከት', 'ማመልከቻ', 'ማመልከት']):
             how = job.application_url or job.contact_instructions or "Check with the employer."
-            answer = f"Application instructions for {job.title}: {how}"
+            if is_amharic:
+                answer = f"ለ{job.title} የማመልከቻ መንገድ፡ {how}።"
+            else:
+                answer = f"Application instructions for {job.title}: {how}"
             grounded = True
             field = 'application_url'
 
+        # 6. General Overview Fallback
         else:
-            # Fallback to description summary
-            answer = (
-                f"About {job.title} at {job.organization}: {job.description[:400]}... "
-                f"Location: {job.location} ({job.get_remote_policy_display()})."
-            )
+            if is_amharic:
+                answer = (
+                    f"ስለ {job.title} በ{job.organization}፡ {job.description[:300]}... "
+                    f"ቦታ፡ {job.location} ({job.get_remote_policy_display()})።"
+                )
+            else:
+                answer = (
+                    f"About {job.title} at {job.organization}: {job.description[:400]}... "
+                    f"Location: {job.location} ({job.get_remote_policy_display()})."
+                )
             grounded = True
             field = 'description'
 
@@ -102,9 +136,64 @@ class JobQAService:
             "answer": answer,
             "grounded": grounded,
             "field_referenced": field,
-            "language": language,
+            "language": 'am' if is_amharic else 'en',
             "source": f"JobListing:{job.id}"
         }
+
+
+class JobListingSimpleModeService:
+    """
+    Cognitive Accessibility & Plain Language (Simple Mode).
+    De-jargonizes corporate job descriptions into clear, digestible, plain-language sections.
+    """
+
+    @classmethod
+    def simplify(cls, job: JobListing, language: str = 'en') -> Dict[str, Any]:
+        is_am = (language == 'am')
+
+        # Extract essential skills as plain bullet points
+        skills = job.required_skills if isinstance(job.required_skills, list) else [str(job.required_skills)]
+
+        if is_am:
+            return {
+                "job_id": str(job.id),
+                "title": job.title,
+                "organization": job.organization,
+                "language": "am",
+                "plain_summary": f"ይህ ሥራ በ{job.organization} ድርጅት ውስጥ የሚሰራ የ{job.title} ክፍት የሥራ ቦታ ነው።",
+                "what_you_will_do": [
+                    f"በ{job.organization} ውስጥ እንደ {job.title} ሆነው ይሰራሉ",
+                    f"የሥራው ቦታ፡ {job.location} ({job.get_remote_policy_display()})",
+                    f"የሥራው ዓይነት፡ {job.get_employment_type_display()}"
+                ],
+                "what_you_need": skills or ["መሰረታዊ የቴክኖሎጂ እውቀት"],
+                "pay_and_deadline": {
+                    "salary": job.salary_info or "በማስታወቂያው ላይ አልተጠቀሰም",
+                    "deadline": job.deadline.strftime('%B %d, %Y') if job.deadline else "ያልተወሰነ"
+                },
+                "how_to_apply": job.application_url or job.contact_instructions or "በቀጥታ አሰሪውን ያነጋግሩ",
+                "interview_accommodations_note": "ማስታወሻ፡ በቃለ-መጠይቅ ወቅት ተጨማሪ ጊዜ ወይም የቴክኖሎጂ ማመቻቻ መጠየቅ ይችላሉ።"
+            }
+        else:
+            return {
+                "job_id": str(job.id),
+                "title": job.title,
+                "organization": job.organization,
+                "language": "en",
+                "plain_summary": f"In simple terms, this is a {job.get_employment_type_display()} role as {job.title} at {job.organization}.",
+                "what_you_will_do": [
+                    f"Work as {job.title} at {job.organization}",
+                    f"Location: {job.location} ({job.get_remote_policy_display()})",
+                    f"Commitment: {job.get_employment_type_display()}"
+                ],
+                "what_you_need": skills or ["Basic foundational skills"],
+                "pay_and_deadline": {
+                    "salary": job.salary_info or "Not stated in listing",
+                    "deadline": job.deadline.strftime('%B %d, %Y') if job.deadline else "Open until filled"
+                },
+                "how_to_apply": job.application_url or job.contact_instructions or "Contact employer directly",
+                "interview_accommodations_note": "Accessibility Guarantee: You have the right to request interview accommodations (such as screen reader support or extra time) using the accommodation form."
+            }
 
 
 class JobAlertService:
