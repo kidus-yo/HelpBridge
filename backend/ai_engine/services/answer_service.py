@@ -14,16 +14,57 @@ from ai_engine.providers.local import LocalAIProvider
 from ai_engine.providers.mock import MockAIProvider
 from ai_engine.services.faq_fallback import FAQFallbackService
 from ai_engine.services.prompt_templates import REFUSALS, HUMAN_HELP_PROMPT
+from knowledge.services.retrieval import search_course_content
+
+
+class DatabaseKnowledgeRetrievalService:
+    def __init__(self, fallback_service: Optional[MockKnowledgeRetrievalService] = None):
+        self.fallback_service = fallback_service or MockKnowledgeRetrievalService()
+
+    def search(
+        self,
+        question: str,
+        course_id: Optional[str] = None,
+        language: str = 'en',
+        limit: int = 3,
+        institution_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        if not question or not question.strip():
+            return []
+
+        if institution_id is not None:
+            try:
+                return search_course_content(
+                    institution_id=institution_id,
+                    query=question,
+                    course_id=course_id,
+                    language=language,
+                    limit=limit,
+                )
+            except Exception:  # pragma: no cover - defensive guard at the boundary
+                return self.fallback_service.search(
+                    question=question,
+                    course_id=course_id,
+                    language=language,
+                    limit=limit,
+                )
+
+        return self.fallback_service.search(
+            question=question,
+            course_id=course_id,
+            language=language,
+            limit=limit,
+        )
 
 
 class AnswerGenerationService:
     def __init__(
         self,
-        retrieval_service: Optional[MockKnowledgeRetrievalService] = None,
+        retrieval_service: Optional[object] = None,
         faq_service: Optional[FAQFallbackService] = None,
         default_provider_name: Optional[str] = None
     ):
-        self.retrieval_service = retrieval_service or MockKnowledgeRetrievalService()
+        self.retrieval_service = retrieval_service or DatabaseKnowledgeRetrievalService()
         self.faq_service = faq_service or FAQFallbackService()
         self.default_provider_name = default_provider_name or getattr(settings, 'AI_PROVIDER', 'offline')
         self.threshold = getattr(settings, 'AI_GROUNDING_THRESHOLD', 0.25)
@@ -45,7 +86,8 @@ class AnswerGenerationService:
         course_id: Optional[str] = 'course-va-101',
         language: str = 'am',
         conversation_context: Optional[List[Dict[str, Any]]] = None,
-        provider_name: Optional[str] = None
+        provider_name: Optional[str] = None,
+        institution_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Main entry point for question answering.
@@ -76,7 +118,8 @@ class AnswerGenerationService:
             question=clean_q,
             course_id=course_id,
             language=lang,
-            limit=3
+            limit=3,
+            institution_id=institution_id,
         )
 
         is_sufficient_evidence = bool(
@@ -124,7 +167,8 @@ def generate_answer(
     course_id: Optional[str] = 'course-va-101',
     language: str = 'am',
     conversation_context: Optional[List[Dict[str, Any]]] = None,
-    provider_name: Optional[str] = None
+    provider_name: Optional[str] = None,
+    institution_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Public functional interface for other modules (Koket's chat, Telegram bot, SMS)."""
     return _answer_service.answer_question(
@@ -132,5 +176,6 @@ def generate_answer(
         course_id=course_id,
         language=language,
         conversation_context=conversation_context,
-        provider_name=provider_name
+        provider_name=provider_name,
+        institution_id=institution_id,
     )

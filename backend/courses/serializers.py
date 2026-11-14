@@ -4,10 +4,13 @@ from courses.models import Course, CourseSection, Lesson, LessonResource
 
 
 class LessonResourceSerializer(serializers.ModelSerializer):
+    lesson = serializers.UUIDField(source="lesson_id", read_only=True)
+
     class Meta:
         model = LessonResource
         fields = [
             "id",
+            "lesson",
             "resource_type",
             "title",
             "external_url",
@@ -16,7 +19,7 @@ class LessonResourceSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "lesson", "created_at", "updated_at"]
 
 
 class LessonSerializer(serializers.ModelSerializer):

@@ -1,7 +1,7 @@
 from django.db import transaction
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from courses.models import Course, CourseSection, Lesson
+from courses.models import Course, CourseSection, Lesson, LessonResource
 from platforms.services.context import get_platform_context
 from platforms.tenant import get_institution, is_staff
 
@@ -96,5 +96,58 @@ def create_lesson(request, section: CourseSection, validated_data: dict) -> Less
     if not _can_write(request):
         raise PermissionDenied("Missing courses:write scope.")
     return Lesson.objects.create(section=section, **validated_data)
+
+
+def lesson_resource_queryset(request, lesson: Lesson):
+    qs = lesson.resources.select_related("lesson__section__course__institution")
+    context = get_platform_context(request)
+    if context is not None:
+        return qs.filter(lesson__section__course__institution_id=context.institution_id)
+    if is_staff(request):
+        return qs
+    return qs.none()
+
+
+def get_owned_lesson(request, lesson_id) -> Lesson:
+    qs = Lesson.objects.select_related("section__course__institution")
+    context = get_platform_context(request)
+    if context is not None:
+        qs = qs.filter(section__course__institution_id=context.institution_id)
+    elif not is_staff(request):
+        qs = qs.none()
+    try:
+        return qs.get(id=lesson_id)
+    except Lesson.DoesNotExist as exc:
+        raise PermissionDenied("Lesson not found for this tenant.") from exc
+
+
+def get_owned_resource(request, resource_id) -> LessonResource:
+    qs = LessonResource.objects.select_related("lesson__section__course__institution")
+    context = get_platform_context(request)
+    if context is not None:
+        qs = qs.filter(lesson__section__course__institution_id=context.institution_id)
+    elif not is_staff(request):
+        qs = qs.none()
+    try:
+        return qs.get(id=resource_id)
+    except LessonResource.DoesNotExist as exc:
+        raise PermissionDenied("Resource not found for this tenant.") from exc
+
+
+@transaction.atomic
+def create_lesson_resource(request, lesson: Lesson, validated_data: dict) -> LessonResource:
+    if not _can_write(request):
+        raise PermissionDenied("Missing courses:write scope.")
+    return LessonResource.objects.create(lesson=lesson, **validated_data)
+
+
+@transaction.atomic
+def update_lesson_resource(request, resource: LessonResource, validated_data: dict) -> LessonResource:
+    if not _can_write(request):
+        raise PermissionDenied("Missing courses:write scope.")
+    for key, value in validated_data.items():
+        setattr(resource, key, value)
+    resource.save()
+    return resource
 
 
