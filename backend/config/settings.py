@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'common.apps.CommonConfig',
     'ai_engine.apps.AiEngineConfig',
     'channels.apps.ChannelsConfig',
+    'support.apps.SupportConfig',
+    'careers.apps.CareersConfig',
 ]
 
 MIDDLEWARE = [
