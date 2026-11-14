@@ -29,12 +29,23 @@ class ChatSessionListCreateView(APIView):
         data = serializer.validated_data
 
         user = request.user if request.user.is_authenticated else None
+        platform_ctx = getattr(request, "platform_context", None)
+
+        inst_id = request.data.get("institution_id")
+        crs_id = request.data.get("course_id")
+        pref_lang = request.data.get("preferred_language")
+
+        if platform_ctx:
+            inst_id = inst_id or str(platform_ctx.institution_id)
+            if platform_ctx.context_type == "course" and platform_ctx.context_id:
+                crs_id = crs_id or str(platform_ctx.context_id)
+            pref_lang = pref_lang or platform_ctx.preferred_language
 
         session = create_chat_session(
-            institution_id=data.get('institution_id', 'inst-default'),
-            course_id=data.get('course_id', 'course-va-101'),
-            channel=data.get('channel', 'web'),
-            preferred_language=data.get('preferred_language', 'en'),
+            institution_id=inst_id or data.get("institution_id") or "inst-default",
+            course_id=crs_id or data.get("course_id") or "course-va-101",
+            channel=data.get("channel", "web"),
+            preferred_language=pref_lang or data.get("preferred_language") or "en",
             user=user
         )
 

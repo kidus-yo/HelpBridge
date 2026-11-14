@@ -45,6 +45,10 @@ staticfiles/
 *.swp
 *.swo
 
+# Node / Frontend
+node_modules/
+package-lock.json
+
 # Testing & Coverage
 .pytest_cache/
 .coverage

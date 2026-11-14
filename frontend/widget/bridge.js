@@ -16,16 +16,16 @@
     return scripts[scripts.length - 1];
   })();
 
-  const API_BASE = (currentScript && currentScript.getAttribute('data-api')) || 'http://localhost:8000';
-  const COURSE_ID = (currentScript && currentScript.getAttribute('data-course')) || 'course-va-101';
-  const INSTITUTION_ID = (currentScript && currentScript.getAttribute('data-institution')) || 'inst-default';
-  const INITIAL_LANG = (currentScript && currentScript.getAttribute('data-lang')) || 'en';
+  let apiBase = (currentScript && currentScript.getAttribute('data-api')) || 'http://localhost:8000';
+  let courseId = (currentScript && currentScript.getAttribute('data-course')) || 'course-va-101';
+  let institutionId = (currentScript && currentScript.getAttribute('data-institution')) || 'inst-default';
+  let currentLang = (currentScript && currentScript.getAttribute('data-lang')) || 'en';
+  let authToken = (currentScript && currentScript.getAttribute('data-token')) || null;
 
   // State
   let sessionId = null;
   let isOpen = false;
   let viewMode = 'chat'; // 'chat' | 'settings'
-  let currentLang = INITIAL_LANG; // 'en' | 'am'
   let simpleMode = false;
   let textSize = 'normal'; // 'normal' | 'large' | 'xlarge'
   let isRtl = false;
@@ -34,6 +34,16 @@
   let messages = [];
   let isLoading = false;
   let previousFocusedElement = null;
+  let keydownListenerAttached = false;
+
+  function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+      headers['X-HelpBridge-Context'] = authToken;
+    }
+    return headers;
+  }
 
   // Bilingual UI Dictionary
   const I18N = {
@@ -481,19 +491,60 @@
     }
   `;
 
-  function init() {
+  function handleKeyDown(e) {
+    if (e.key === 'Escape' && isOpen) {
+      toggleWidget(false);
+    }
+  }
+
+  function init(options) {
+    if (options && typeof options === 'object') {
+      if (options.api) apiBase = options.api;
+      if (options.course) courseId = options.course;
+      if (options.institution) institutionId = options.institution;
+      if (options.lang) currentLang = options.lang;
+      if (options.token) authToken = options.token;
+    }
+
     if (document.getElementById('digital-bridge-root')) return;
 
     const hostDiv = document.createElement('div');
     hostDiv.id = 'digital-bridge-root';
     document.body.appendChild(hostDiv);
 
-    const styleEl = document.createElement('style');
-    styleEl.textContent = STYLES;
-    document.head.appendChild(styleEl);
+    let styleEl = document.getElementById('digital-bridge-styles');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'digital-bridge-styles';
+      styleEl.textContent = STYLES;
+      document.head.appendChild(styleEl);
+    }
+
+    if (!keydownListenerAttached) {
+      document.addEventListener('keydown', handleKeyDown);
+      keydownListenerAttached = true;
+    }
 
     render();
     initSession();
+  }
+
+  function destroy() {
+    const root = document.getElementById('digital-bridge-root');
+    if (root && root.parentNode) {
+      root.parentNode.removeChild(root);
+    }
+    const styleEl = document.getElementById('digital-bridge-styles');
+    if (styleEl && styleEl.parentNode) {
+      styleEl.parentNode.removeChild(styleEl);
+    }
+    if (keydownListenerAttached) {
+      document.removeEventListener('keydown', handleKeyDown);
+      keydownListenerAttached = false;
+    }
+    isOpen = false;
+    sessionId = null;
+    messages = [];
   }
 
   function render() {
@@ -696,7 +747,7 @@
     return messages.map(msg => {
       const isLearner = msg.sender_type === 'learner';
       const isAgent = msg.sender_type === 'agent';
-      const citations = (msg.metadata && msg.metadata.citations) || [];
+      const citations = (msg.metadata && msg.metadata.citations) || msg.citations || [];
 
       let citationsHtml = '';
       if (citations.length > 0) {
@@ -769,13 +820,13 @@
       const payload = {
         channel: 'web',
         preferred_language: currentLang,
-        course_id: COURSE_ID,
-        institution_id: INSTITUTION_ID
+        course_id: courseId,
+        institution_id: institutionId
       };
 
-      const res = await fetch(`${API_BASE}/api/v1/chat/sessions/`, {
+      const res = await fetch(`${apiBase}/api/v1/chat/sessions/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -792,7 +843,9 @@
   async function loadAccessibilityPreferences() {
     if (!sessionId) return;
     try {
-      const res = await fetch(`${API_BASE}/api/v1/accessibility/preferences/${sessionId}/`);
+      const res = await fetch(`${apiBase}/api/v1/accessibility/preferences/${sessionId}/`, {
+        headers: getHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         simpleMode = !!data.simple_mode;
@@ -800,7 +853,9 @@
         isRtl = !!data.right_to_left || data.text_direction === 'rtl';
         highContrast = !!data.high_contrast;
         voiceEnabled = data.voice_enabled !== false;
-        if (data.language) currentLang = data.language;
+        if (data.preferred_language || data.language) {
+          currentLang = data.preferred_language || data.language;
+        }
         render();
       }
     } catch (e) {
@@ -811,6 +866,7 @@
   async function updateAccessibilityPreferences(patchData) {
     // Apply locally first for immediate responsiveness
     if ('language' in patchData) currentLang = patchData.language;
+    if ('preferred_language' in patchData) currentLang = patchData.preferred_language;
     if ('simple_mode' in patchData) simpleMode = patchData.simple_mode;
     if ('text_size' in patchData) textSize = patchData.text_size;
     if ('voice_enabled' in patchData) voiceEnabled = patchData.voice_enabled;
@@ -822,9 +878,9 @@
     // Persist to backend if session exists
     if (!sessionId) return;
     try {
-      await fetch(`${API_BASE}/api/v1/accessibility/preferences/${sessionId}/`, {
+      await fetch(`${apiBase}/api/v1/accessibility/preferences/${sessionId}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(patchData)
       });
     } catch (e) {
@@ -848,16 +904,23 @@
     try {
       if (!sessionId) await initSession();
 
-      const res = await fetch(`${API_BASE}/api/v1/chat/sessions/${sessionId}/messages/`, {
+      const res = await fetch(`${apiBase}/api/v1/chat/sessions/${sessionId}/messages/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify({ content: trimmed, language: currentLang })
       });
 
       if (res.ok) {
         const data = await res.json();
-        messages.push(data.assistant_message);
-        announce(`${t('liveNewMessagePrefix')} ${t('title')}: ${data.assistant_message.content}`);
+        const astMsg = data.assistant_message || {};
+        if (!astMsg.metadata) {
+          astMsg.metadata = {};
+        }
+        if (data.citations && (!astMsg.metadata.citations || astMsg.metadata.citations.length === 0)) {
+          astMsg.metadata.citations = data.citations;
+        }
+        messages.push(astMsg);
+        announce(`${t('liveNewMessagePrefix')} ${t('title')}: ${astMsg.content || ''}`);
       } else {
         messages.push({
           sender_type: 'assistant',
@@ -1018,19 +1081,43 @@
       setVoice.onchange = (e) => updateAccessibilityPreferences({ voice_enabled: e.target.checked });
     }
 
-    // Keyboard support: Close on Escape
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && isOpen) {
-        toggleWidget(false);
-      }
-    });
+  }
+
+  // Public integration API
+  const publicApi = {
+    init: init,
+    open: () => toggleWidget(true),
+    close: () => toggleWidget(false),
+    toggle: () => toggleWidget(),
+    destroy: destroy,
+    setLanguage: (lang) => updateAccessibilityPreferences({ language: lang, preferred_language: lang }),
+    setHighContrast: (val) => updateAccessibilityPreferences({ high_contrast: !!val }),
+    setSimpleMode: (val) => updateAccessibilityPreferences({ simple_mode: !!val }),
+    sendMessage: (text) => sendMessage(text),
+    getState: () => ({
+      sessionId,
+      isOpen,
+      currentLang,
+      simpleMode,
+      highContrast,
+      textSize,
+      isRtl,
+      messageCount: messages.length,
+      isLoading
+    })
+  };
+
+  if (typeof window !== 'undefined') {
+    window.DigitalBridgeAssistant = publicApi;
+    window.DigitalBridge = publicApi;
   }
 
   // Auto-boot when DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => init());
+    } else {
+      init();
+    }
   }
-
 })();

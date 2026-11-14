@@ -107,7 +107,8 @@ def process_learner_message(session_id, content: str, language: str = None):
             "content": assistant_msg.content,
             "sender_type": assistant_msg.sender_type,
             "language": assistant_msg.language,
-            "created_at": assistant_msg.created_at.isoformat()
+            "created_at": assistant_msg.created_at.isoformat(),
+            "metadata": assistant_msg.metadata
         },
         "citations": ai_result.get("citations", []),
         "grounded": ai_result.get("grounded", False),
