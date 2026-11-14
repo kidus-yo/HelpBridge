@@ -38,20 +38,33 @@ ALLOWED_HOSTS = [
 ]
 
 INSTALLED_APPS = [
+    # Django built-in apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
+    # Third-party apps
     "rest_framework",
     "drf_spectacular",
+
+    # Shared foundation
     "common.apps.CommonConfig",
+
+    # Your backend apps
     "platforms.apps.PlatformsConfig",
     "courses.apps.CoursesConfig",
     "knowledge.apps.KnowledgeConfig",
+
+    # AI and communication
     "ai_engine.apps.AiEngineConfig",
     "channels.apps.ChannelsConfig",
+
+    # Teammates' apps
+    "chat.apps.ChatConfig",
+    "accessibility.apps.AccessibilityConfig",
 ]
 
 MIDDLEWARE = [

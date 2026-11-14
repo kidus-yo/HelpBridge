@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Savanna LMS — Course Syllabus & Overview</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .wrapper {
+      max-width: 1000px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .module-card {
+      border: 1px solid #cbd5e1;
+      padding: 1rem 1.5rem;
+      margin-top: 1rem;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn {
+      background: #0284c7;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>ALX Savanna Learning Portal</h2>
+    <nav><span>Dashboard</span> | <span>Courses</span></nav>
+  </header>
+
+  <div class="wrapper">
+    <h1>Virtual Assistant Professional Program (VA-101)</h1>
+    <p>Prepare for high-growth remote administrative, operations, and AI-assisted workflows.</p>
+
+    <h2>Syllabus & Modules</h2>
+    <div class="module-card">
+      <div>
+        <h3>Module 1: The Future of the Virtual Assistant Industry</h3>
+        <p>Learn how remote work and AI productivity are reshaping career paths.</p>
+      </div>
+      <a href="savanna_concept.html" class="btn">Start Lesson →</a>
+    </div>
+
+    <div class="module-card">
+      <div>
+        <h3>Module 2: Client Management & Asynchronous Communication</h3>
+        <p>Master scheduling across time zones and writing effective executive briefs.</p>
+      </div>
+      <a href="#" class="btn">View Module →</a>
+    </div>
+
+    <div class="module-card">
+      <div>
+        <h3>Knowledge Check: Module 1 Assessment</h3>
+        <p>Interactive practice quiz on AI tools and remote coordination.</p>
+      </div>
+      <a href="savanna_quiz.html" class="btn">Take Quiz →</a>
+    </div>
+  </div>
+
+  <!-- Digital Bridge Assistant Widget Integration -->
+  <script 
+    src="../frontend/widget/bridge.js"
+    data-api="http://localhost:8000"
+    data-course="course-va-101"
+    data-lang="en">
+  </script>
+</body>
+</html>
