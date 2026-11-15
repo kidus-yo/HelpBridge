@@ -138,15 +138,96 @@ class TelegramBotHandler:
                 "📖 **የዲጂታል ብሪጅ ረዳት አጠቃቀም መመሪያ**\n\n"
                 "• ጥያቄዎን በጽሑፍ ይላኩ፤ ረዳቱ ከትክክለኛ የኮርሱ ይዘት አመሳክሮ መልስ ይሰጣል።\n"
                 "• ቋንቋ ለመቀየር `/language` ይላኩ።\n"
+                "• ክፍት የሥራ ዕድሎችን ለማየት `/jobs` ይላኩ።\n"
+                "• አዳዲስ የሥራ ማስታወቂያዎች በቴሌግራም እንዲደርስዎት `/subscribe` ይላኩ።\n"
                 "• ከሰው አስተማሪ ጋር ለመገናኘት 'ከሰው ጋር ተነጋገር' ማለት ይችላሉ።"
                 if lang == 'am' else
                 "📖 **Digital Bridge Assistant Help**\n\n"
                 "• Text any course question; the assistant answers using grounded course evidence.\n"
                 "• Type `/language` anytime to change language.\n"
+                "• Type `/jobs` to view latest accessible job opportunities.\n"
+                "• Type `/subscribe` to receive real-time job alerts in Telegram.\n"
                 "• If an answer cannot be found, you can request human assistance."
             )
             self.client.send_message(chat_id=chat_id, text=help_text)
             return {"ok": True, "action": "help"}
+
+        # Command /jobs
+        if text.startswith("/jobs") or text.startswith("/career"):
+            from careers.models import JobListing
+            jobs = JobListing.objects.filter(status='published')[:5]
+            if not jobs.exists():
+                msg = (
+                    "በአሁኑ ሰዓት ክፍት የሥራ ማስታወቂያዎች የሉም። እባክዎ ትንሽ ቆይተው እንደገና ይመልከቱ።"
+                    if lang == 'am' else
+                    "No published job opportunities at the moment. Please check back soon."
+                )
+            else:
+                if lang == 'am':
+                    msg = "💼 **የቅርብ ጊዜ ክፍት የሥራ ዕድሎች (Latest Tech Jobs):**\n\n"
+                    for idx, j in enumerate(jobs, 1):
+                        msg += (
+                            f"{idx}. **{j.title}**\n"
+                            f"   🏢 ድርጅት: {j.organization}\n"
+                            f"   📍 ቦታ: {j.location} ({j.get_remote_policy_display()})\n"
+                            f"   💰 ደመወዝ: {j.salary_info or 'ያልተገለጸ'}\n"
+                            f"   🔗 ማመልከቻ: {j.application_url or 'በፖርታሉ ይመልከቱ'}\n\n"
+                        )
+                    msg += "🔔 አዳዲስ የሥራ ማስታወቂያዎች ሲወጡ በቴሌግራም መልእክት እንዲደርስዎ `/subscribe` ብለው ይላኩ።"
+                else:
+                    msg = "💼 **Latest Accessible Job Opportunities:**\n\n"
+                    for idx, j in enumerate(jobs, 1):
+                        msg += (
+                            f"{idx}. **{j.title}**\n"
+                            f"   🏢 Org: {j.organization}\n"
+                            f"   📍 Location: {j.location} ({j.get_remote_policy_display()})\n"
+                            f"   💰 Pay: {j.salary_info or 'Not specified'}\n"
+                            f"   🔗 Apply: {j.application_url or 'Check LMS portal'}\n\n"
+                        )
+                    msg += "🔔 Type `/subscribe` to receive alerts when new jobs are published."
+
+            self.client.send_message(chat_id=chat_id, text=msg)
+            return {"ok": True, "action": "jobs_list", "count": jobs.count()}
+
+        # Command /subscribe or /jobalerts
+        if text.startswith("/subscribe") or text.startswith("/jobalerts") or text.startswith("/alert"):
+            from careers.models import JobAlertSubscription
+            sub, created = JobAlertSubscription.objects.get_or_create(
+                channel='telegram',
+                contact_identity=str(chat_id),
+                defaults={'is_active': True}
+            )
+            if not sub.is_active:
+                sub.is_active = True
+                sub.save(update_fields=['is_active', 'updated_at'])
+
+            msg = (
+                "✅ **የሥራ ማስታወቂያ ማሳወቂያ በተሳካ ሁኔታ ተመዝግቧል!**\n\n"
+                "አዳዲስ የቴክኖሎጂ የሥራ ዕድሎች ሲወጡ ወዲያውኑ በዚህ የቴሌግራም ቻት ይደርስዎታል።\n"
+                "ለማቆም በማንኛውም ሰዓት `/unsubscribe` መላክ ይችላሉ።"
+                if lang == 'am' else
+                "✅ **Job alerts successfully enabled!**\n\n"
+                "You will receive immediate Telegram notifications whenever new tech jobs are published.\n"
+                "Type `/unsubscribe` anytime to stop alerts."
+            )
+            self.client.send_message(chat_id=chat_id, text=msg)
+            return {"ok": True, "action": "subscribe"}
+
+        # Command /unsubscribe
+        if text.startswith("/unsubscribe") or text.startswith("/stop"):
+            from careers.models import JobAlertSubscription
+            JobAlertSubscription.objects.filter(
+                channel='telegram',
+                contact_identity=str(chat_id)
+            ).update(is_active=False)
+
+            msg = (
+                "❌ **የሥራ ማስታወቂያ ምዝገባዎ ተሰርዟል።**\n\nእንደገና ለመመዝገብ `/subscribe` ይላኩ።"
+                if lang == 'am' else
+                "❌ **Job alerts unsubscribed.**\n\nType `/subscribe` anytime to resume notifications."
+            )
+            self.client.send_message(chat_id=chat_id, text=msg)
+            return {"ok": True, "action": "unsubscribe"}
 
         # Record learner message in central conversation lifecycle
         MockChatService.append_message(
