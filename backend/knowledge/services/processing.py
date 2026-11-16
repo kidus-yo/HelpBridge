@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import zipfile
+from io import BytesIO
+from pathlib import Path
 from typing import BinaryIO
 
 from django.conf import settings
@@ -24,8 +27,9 @@ ALLOWED_TYPES = {
     "application/pdf": "pdf",
     "application/x-pdf": "pdf",
     "text/plain": "txt",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
 }
-ALLOWED_EXTENSIONS = {".pdf": "pdf", ".txt": "txt"}
+ALLOWED_EXTENSIONS = {".pdf": "pdf", ".docx": "docx", ".txt": "txt"}
 
 
 def _can_write(request) -> bool:
@@ -46,14 +50,16 @@ def _can_process(request) -> bool:
 
 
 def _detect_type(filename: str, content_type: str | None) -> str:
-    name = (filename or "").lower()
-    for ext, dtype in ALLOWED_EXTENSIONS.items():
-        if name.endswith(ext):
-            return dtype
-    if content_type in ALLOWED_TYPES:
-        return ALLOWED_TYPES[content_type]
+    extension = Path(filename or "").suffix.lower()
+    document_type = ALLOWED_EXTENSIONS.get(extension)
+    if document_type and (
+        not content_type
+        or content_type == "application/octet-stream"
+        or ALLOWED_TYPES.get(content_type) == document_type
+    ):
+        return document_type
     raise ValidationError(
-        {"file": "Unsupported file type. Upload a PDF or UTF-8 TXT file. Scanned PDFs require OCR, which is not implemented."}
+        {"file": "Unsupported file type or MIME type. Upload a PDF, DOCX, or UTF-8 TXT file. Scanned PDFs require OCR, which is not implemented."}
     )
 
 
@@ -70,6 +76,20 @@ def store_upload(request, *, uploaded_file: BinaryIO, institution_id=None, cours
         raise ValidationError({"file": "The uploaded file is empty."})
     if len(content) > max_bytes:
         raise ValidationError({"file": f"File exceeds the {settings.DOCUMENT_MAX_UPLOAD_MB} MB limit."})
+    if document_type == "pdf" and b"%PDF-" not in content[:1024]:
+        raise ValidationError({"file": "The uploaded file is not a valid PDF."})
+    if document_type == "txt":
+        try:
+            content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValidationError({"file": "TXT documents must be valid UTF-8."}) from exc
+    if document_type == "docx":
+        try:
+            with zipfile.ZipFile(BytesIO(content)) as archive:
+                if "word/document.xml" not in archive.namelist():
+                    raise ValidationError({"file": "The uploaded file is not a valid DOCX document."})
+        except zipfile.BadZipFile as exc:
+            raise ValidationError({"file": "The uploaded file is not a valid DOCX document."}) from exc
 
     institution = get_institution(request, institution_id)
     course = None

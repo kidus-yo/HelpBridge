@@ -2,6 +2,9 @@ import pytest
 from django.contrib.auth.models import User, Group
 from rest_framework.test import APIClient
 from support.models import SupportRequest, SupportMessage
+from chat.models import ChatSession, Message
+from courses.models import Course
+from platforms.tests.factories import context_token, make_integration, make_institution
 
 
 @pytest.fixture
@@ -66,6 +69,66 @@ class TestSupportRequests:
         response = api_client.post('/api/v1/support/requests/', payload, format='json')
         assert response.status_code == 201
         assert response.data['learner_consent_chat_history'] is False
+
+    def test_platform_context_links_only_its_own_chat_and_institution(self, api_client):
+        scopes = ["courses:read", "knowledge:read", "support:write"]
+        integration = make_integration(scopes=scopes)
+        course = Course.objects.create(
+            institution_id=integration.institution_id,
+            title="Published course",
+            slug="support-course",
+            status=Course.Status.PUBLISHED,
+        )
+        session = ChatSession.objects.create(
+            institution_id=str(integration.institution_id),
+            course_id=str(course.id),
+            platform_integration_id=integration.id,
+            platform_user_ref="learner-ref",
+        )
+        token = context_token(
+            integration,
+            user_ref="learner-ref",
+            context_type="course",
+            context_id=str(course.id),
+            scopes=scopes,
+        )
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        response = api_client.post(
+            "/api/v1/support/requests/",
+            {
+                "subject": "Need help",
+                "description": "Please contact me.",
+                "chat_session_id": str(session.id),
+                "learner_consent_chat_history": True,
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+        assert response.data["institution_id"] == str(integration.institution_id)
+        assert response.data["chat_session_id"] == str(session.id)
+        assert response.data["guest_token"]
+
+        other_integration = make_integration(
+            platform=integration.platform,
+            institution=make_institution(slug="support-other", name="Other"),
+            scopes=scopes,
+        )
+        other_session = ChatSession.objects.create(
+            institution_id=str(other_integration.institution_id),
+            course_id=str(course.id),
+            platform_integration_id=other_integration.id,
+            platform_user_ref="learner-ref",
+        )
+        denied = api_client.post(
+            "/api/v1/support/requests/",
+            {
+                "subject": "Cross-tenant attempt",
+                "description": "Should not attach.",
+                "chat_session_id": str(other_session.id),
+            },
+            format="json",
+        )
+        assert denied.status_code == 404
 
     def test_guest_learner_can_create_and_view_ticket_with_token(self, api_client):
         payload = {
@@ -138,7 +201,9 @@ class TestSupportRequests:
         )
         assert patch_resp.status_code == 403
 
-    def test_two_way_messaging_between_learner_and_agent(self, api_client, learner_user, support_agent):
+    def test_two_way_messaging_between_learner_and_agent(
+        self, api_client, learner_user, other_learner, support_agent
+    ):
         ticket = SupportRequest.objects.create(
             learner=learner_user,
             subject="Question on arrays",
@@ -167,11 +232,22 @@ class TestSupportRequests:
         assert msg_resp2.status_code == 201
         assert msg_resp2.data['sender_type'] == 'agent'
 
+        api_client.force_authenticate(user=learner_user)
+        messages = api_client.get(f'/api/v1/support/requests/{ticket.id}/messages/')
+        assert messages.status_code == 200
+        assert len(messages.data) == 2
+
+        api_client.force_authenticate(user=other_learner)
+        private_messages = api_client.get(
+            f'/api/v1/support/requests/{ticket.id}/messages/'
+        )
+        assert private_messages.status_code == 403
+
         # Verify ticket moved to in_progress automatically
         ticket.refresh_from_db()
         assert ticket.status == 'in_progress'
 
-    def test_learner_controlled_screen_share_start_and_stop(self, api_client, learner_user):
+    def test_screen_share_is_reported_unavailable_without_a_provider(self, api_client, learner_user):
         ticket = SupportRequest.objects.create(
             learner=learner_user,
             subject="Live debug request",
@@ -180,30 +256,50 @@ class TestSupportRequests:
         )
         api_client.force_authenticate(user=learner_user)
 
-        # Start screen sharing
         start_resp = api_client.post(
             f'/api/v1/support/requests/{ticket.id}/screenshare/',
             {"action": "start"},
             format='json'
         )
-        assert start_resp.status_code == 200
-        assert start_resp.data['screen_share_active'] is True
-        assert 'session_token' in start_resp.data
-
-        ticket.refresh_from_db()
-        assert ticket.screen_share_active is True
-
-        # Stop screen sharing
-        stop_resp = api_client.post(
-            f'/api/v1/support/requests/{ticket.id}/screenshare/',
-            {"action": "stop"},
-            format='json'
-        )
-        assert stop_resp.status_code == 200
-        assert stop_resp.data['screen_share_active'] is False
+        assert start_resp.status_code == 501
+        assert start_resp.data['error']['code'] == 'screen_sharing_unavailable'
 
         ticket.refresh_from_db()
         assert ticket.screen_share_active is False
+
+    def test_agent_sees_chat_history_only_after_explicit_consent(
+        self, api_client, support_agent
+    ):
+        session = ChatSession.objects.create(
+            institution_id="c6ad5c1f-99aa-4dbc-b530-5847805fcf00",
+            course_id="va-course",
+            platform_user_ref="learner-ref",
+        )
+        Message.objects.create(
+            session=session,
+            sender_type="learner",
+            content="Private course question",
+            language="en",
+        )
+        ticket = SupportRequest.objects.create(
+            subject="Course help",
+            description="Please help.",
+            chat_session_id=session.id,
+            institution_id=session.institution_id,
+            learner_consent_chat_history=True,
+            guest_token="private-guest-token",
+        )
+
+        api_client.force_authenticate(user=support_agent)
+        response = api_client.get(f"/api/v1/support/requests/{ticket.id}/")
+        assert response.status_code == 200
+        assert response.data["shared_chat_history"][0]["content"] == "Private course question"
+        assert response.data["guest_token"] == ""
+
+        ticket.learner_consent_chat_history = False
+        ticket.save(update_fields=["learner_consent_chat_history"])
+        private_response = api_client.get(f"/api/v1/support/requests/{ticket.id}/")
+        assert private_response.data["shared_chat_history"] == []
 
     def test_low_bandwidth_screen_snapshot_fallback(self, api_client, learner_user):
         ticket = SupportRequest.objects.create(

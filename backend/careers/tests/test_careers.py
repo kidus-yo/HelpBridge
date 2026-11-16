@@ -168,6 +168,33 @@ class TestInterviewAccommodations:
         assert data['status'] == 'submitted'
         assert data['functional_needs'] == ["screen_reader", "extra_time_50"]
 
+    def test_guest_token_is_returned_only_once_and_used_in_header(self, api_client):
+        response = api_client.post(
+            '/api/v1/accommodations/',
+            {
+                "functional_needs": ["captions"],
+                "description": "Captions for the interview.",
+                "preferred_contact_method": "email",
+                "contact_details": "guest@example.com",
+                "guest_token": "attacker-controlled-token",
+            },
+            format='json',
+        )
+        assert response.status_code == 201
+        guest_token = response.data["guest_token"]
+        assert guest_token
+        assert guest_token != "attacker-controlled-token"
+
+        query_token_detail = api_client.get(
+            f'/api/v1/accommodations/{response.data["id"]}/?guest_token={guest_token}'
+        )
+        assert query_token_detail.status_code == 403
+
+        api_client.credentials(HTTP_X_GUEST_TOKEN=guest_token)
+        detail = api_client.get(f'/api/v1/accommodations/{response.data["id"]}/')
+        assert detail.status_code == 200
+        assert detail.data["guest_token"] == ""
+
     def test_accommodation_request_is_strictly_private(self, api_client, learner_user, staff_user):
         req = AccommodationRequest.objects.create(
             learner=learner_user,
@@ -202,6 +229,7 @@ class TestJobAlertSubscriptionsAndDispatch:
 
     @patch('channels.notifications.delivery.send_notification')
     def test_job_alert_dispatched_via_shared_channel_adapter(self, mock_notify, staff_user):
+        mock_notify.return_value = {"status": "sent"}
         # Create active subscriptions
         sub_sms = JobAlertSubscription.objects.create(
             contact_identity="+251911223344",
@@ -249,3 +277,25 @@ class TestJobAlertSubscriptionsAndDispatch:
         del_resp = api_client.delete(f'/api/v1/job-alerts/subscriptions/{sub.id}/')
         assert del_resp.status_code == 204
         assert not JobAlertSubscription.objects.filter(id=sub.id).exists()
+
+    @patch('channels.notifications.delivery.send_notification')
+    def test_failed_provider_delivery_is_not_counted_as_dispatched(
+        self, mock_notify, staff_user
+    ):
+        mock_notify.return_value = {"status": "failed"}
+        JobAlertSubscription.objects.create(
+            contact_identity="+251911223344",
+            channel="sms",
+            keywords=["python"],
+            is_active=True,
+        )
+        job = JobListing.objects.create(
+            title="Python Developer",
+            organization="ALX",
+            description="Build Python applications.",
+            location="Addis Ababa",
+            status="published",
+            created_by=staff_user,
+        )
+
+        assert JobAlertService.dispatch_alerts_for_job(job) == 0

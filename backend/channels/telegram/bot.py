@@ -5,11 +5,14 @@ Telegram Bot Message Handler and Workflow Dispatcher.
 import logging
 from typing import Dict, Any, Optional
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from channels.models import ChannelIdentity
 from channels.telegram.client import TelegramClient
-from common.contracts import MockChatService
-from ai_engine.services.answer_service import generate_answer
+from channels.services import get_or_create_central_chat_session
+from chat.services import process_learner_message
 from ai_engine.services.prompt_templates import format_citations_markdown
+from accessibility.models import AccessibilityPreference
+from chat.models import ChatSession
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,7 @@ class TelegramBotHandler:
         if data == "set_lang_am":
             identity.preferred_language = "am"
             identity.save(update_fields=['preferred_language', 'updated_at'])
+            self._update_session_language(identity)
             self.client.answer_callback_query(cb_id, text="ቋንቋዎ ወደ አማርኛ ተቀይሯል!")
             self.client.send_message(
                 chat_id=chat_id,
@@ -64,6 +68,7 @@ class TelegramBotHandler:
         elif data == "set_lang_en":
             identity.preferred_language = "en"
             identity.save(update_fields=['preferred_language', 'updated_at'])
+            self._update_session_language(identity)
             self.client.answer_callback_query(cb_id, text="Language set to English!")
             self.client.send_message(
                 chat_id=chat_id,
@@ -91,16 +96,6 @@ class TelegramBotHandler:
                 'is_active': True
             }
         )
-
-        # Connect or create chat session
-        if not identity.session_id:
-            session = MockChatService.get_or_create_session_for_channel(
-                channel='telegram',
-                external_id=user_id,
-                preferred_language=identity.preferred_language
-            )
-            identity.session_id = session.get('id')
-            identity.save(update_fields=['session_id', 'updated_at'])
 
         lang = identity.preferred_language
 
@@ -152,115 +147,39 @@ class TelegramBotHandler:
             self.client.send_message(chat_id=chat_id, text=help_text)
             return {"ok": True, "action": "help"}
 
-        # Command /jobs
-        if text.startswith("/jobs") or text.startswith("/career"):
-            from careers.models import JobListing
-            jobs = JobListing.objects.filter(status='published')[:5]
-            if not jobs.exists():
-                msg = (
-                    "በአሁኑ ሰዓት ክፍት የሥራ ማስታወቂያዎች የሉም። እባክዎ ትንሽ ቆይተው እንደገና ይመልከቱ።"
-                    if lang == 'am' else
-                    "No published job opportunities at the moment. Please check back soon."
-                )
-            else:
-                if lang == 'am':
-                    msg = "💼 **የቅርብ ጊዜ ክፍት የሥራ ዕድሎች (Latest Tech Jobs):**\n\n"
-                    for idx, j in enumerate(jobs, 1):
-                        msg += (
-                            f"{idx}. **{j.title}**\n"
-                            f"   🏢 ድርጅት: {j.organization}\n"
-                            f"   📍 ቦታ: {j.location} ({j.get_remote_policy_display()})\n"
-                            f"   💰 ደመወዝ: {j.salary_info or 'ያልተገለጸ'}\n"
-                            f"   🔗 ማመልከቻ: {j.application_url or 'በፖርታሉ ይመልከቱ'}\n\n"
-                        )
-                    msg += "🔔 አዳዲስ የሥራ ማስታወቂያዎች ሲወጡ በቴሌግራም መልእክት እንዲደርስዎ `/subscribe` ብለው ይላኩ።"
-                else:
-                    msg = "💼 **Latest Accessible Job Opportunities:**\n\n"
-                    for idx, j in enumerate(jobs, 1):
-                        msg += (
-                            f"{idx}. **{j.title}**\n"
-                            f"   🏢 Org: {j.organization}\n"
-                            f"   📍 Location: {j.location} ({j.get_remote_policy_display()})\n"
-                            f"   💰 Pay: {j.salary_info or 'Not specified'}\n"
-                            f"   🔗 Apply: {j.application_url or 'Check LMS portal'}\n\n"
-                        )
-                    msg += "🔔 Type `/subscribe` to receive alerts when new jobs are published."
-
-            self.client.send_message(chat_id=chat_id, text=msg)
-            return {"ok": True, "action": "jobs_list", "count": jobs.count()}
-
-        # Command /subscribe or /jobalerts
-        if text.startswith("/subscribe") or text.startswith("/jobalerts") or text.startswith("/alert"):
-            from careers.models import JobAlertSubscription
-            sub, created = JobAlertSubscription.objects.get_or_create(
-                channel='telegram',
-                contact_identity=str(chat_id),
-                defaults={'is_active': True}
+        try:
+            session = get_or_create_central_chat_session(identity, "telegram")
+        except ImproperlyConfigured:
+            reply_content = (
+                "ይቅርታ፣ ይህ የመልዕክት ቻናል ገና አልተዋቀረም።"
+                if lang == "am"
+                else "This messaging channel is not configured for a published course yet."
             )
-            if not sub.is_active:
-                sub.is_active = True
-                sub.save(update_fields=['is_active', 'updated_at'])
+            self.client.send_message(chat_id=chat_id, text=reply_content)
+            return {"ok": True, "action": "unavailable", "grounded": False}
 
-            msg = (
-                "✅ **የሥራ ማስታወቂያ ማሳወቂያ በተሳካ ሁኔታ ተመዝግቧል!**\n\n"
-                "አዳዲስ የቴክኖሎጂ የሥራ ዕድሎች ሲወጡ ወዲያውኑ በዚህ የቴሌግራም ቻት ይደርስዎታል።\n"
-                "ለማቆም በማንኛውም ሰዓት `/unsubscribe` መላክ ይችላሉ።"
-                if lang == 'am' else
-                "✅ **Job alerts successfully enabled!**\n\n"
-                "You will receive immediate Telegram notifications whenever new tech jobs are published.\n"
-                "Type `/unsubscribe` anytime to stop alerts."
-            )
-            self.client.send_message(chat_id=chat_id, text=msg)
-            return {"ok": True, "action": "subscribe"}
-
-        # Command /unsubscribe
-        if text.startswith("/unsubscribe") or text.startswith("/stop"):
-            from careers.models import JobAlertSubscription
-            JobAlertSubscription.objects.filter(
-                channel='telegram',
-                contact_identity=str(chat_id)
-            ).update(is_active=False)
-
-            msg = (
-                "❌ **የሥራ ማስታወቂያ ምዝገባዎ ተሰርዟል።**\n\nእንደገና ለመመዝገብ `/subscribe` ይላኩ።"
-                if lang == 'am' else
-                "❌ **Job alerts unsubscribed.**\n\nType `/subscribe` anytime to resume notifications."
-            )
-            self.client.send_message(chat_id=chat_id, text=msg)
-            return {"ok": True, "action": "unsubscribe"}
-
-        # Record learner message in central conversation lifecycle
-        MockChatService.append_message(
-            session_id=identity.session_id,
-            sender_type='learner',
-            content=text,
-            language=lang
-        )
-
-        # Generate evidence-grounded answer
-        ai_result = generate_answer(
-            question=text,
-            language=lang
-        )
-
-        reply_content = ai_result.get("answer", "")
-        citations = ai_result.get("citations", [])
+        result = process_learner_message(session.id, text, language=lang)
+        reply_content = result["assistant_message"]["content"]
+        citations = result.get("citations", [])
         if citations:
             reply_content += format_citations_markdown(citations, language=lang)
-
-        # Record assistant reply
-        MockChatService.append_message(
-            session_id=identity.session_id,
-            sender_type='assistant',
-            content=reply_content,
-            language=lang,
-            metadata={'grounded': ai_result.get('grounded'), 'citations': citations}
-        )
 
         self.client.send_message(chat_id=chat_id, text=reply_content)
         return {
             "ok": True,
             "action": "answer",
-            "grounded": ai_result.get("grounded"),
+            "grounded": result.get("grounded"),
             "citations_count": len(citations)
         }
+
+    @staticmethod
+    def _update_session_language(identity):
+        if not identity.session_id:
+            return
+
+        ChatSession.objects.filter(id=identity.session_id).update(
+            preferred_language=identity.preferred_language
+        )
+        AccessibilityPreference.objects.filter(session_id=identity.session_id).update(
+            preferred_language=identity.preferred_language
+        )

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from common.languages import LANGUAGE_CHOICES
 from .models import AccessibilityPreference
 
 class AccessibilityPreferenceSerializer(serializers.ModelSerializer):
@@ -24,7 +25,7 @@ class AccessibilityPreferenceSerializer(serializers.ModelSerializer):
         return obj.text_direction == 'rtl'
 
 class UpdateAccessibilityPreferenceSerializer(serializers.ModelSerializer):
-    language = serializers.ChoiceField(choices=['en', 'am'], required=False, write_only=True)
+    language = serializers.ChoiceField(choices=LANGUAGE_CHOICES, required=False, write_only=True)
     voice_enabled = serializers.BooleanField(required=False, write_only=True)
     right_to_left = serializers.BooleanField(required=False, write_only=True)
 

@@ -4,14 +4,15 @@ Ensures compliance with Section 6.B, 6.C, and 6.D of the Team Handbook.
 """
 
 from django.test import TestCase
-from ai_engine.services.answer_service import AnswerGenerationService, generate_answer
-from ai_engine.providers.mock import MockAIProvider
+from ai_engine.services.answer_service import AnswerGenerationService
 from common.contracts import MockKnowledgeRetrievalService
 
 
 class AnswerGenerationServiceTests(TestCase):
     def setUp(self):
-        self.service = AnswerGenerationService()
+        self.service = AnswerGenerationService(
+            retrieval_service=MockKnowledgeRetrievalService()
+        )
 
     def test_grounded_answer_from_course_evidence(self):
         """Questions matching course material must return grounded answers with valid citations."""
@@ -84,3 +85,23 @@ class AnswerGenerationServiceTests(TestCase):
         res = self.service.answer_question(question="   ", language="en")
         self.assertFalse(res['grounded'])
         self.assertIn("Please enter your question", res['answer'])
+
+    def test_unsupported_tutor_language_is_not_silently_changed(self):
+        res = self.service.answer_question(
+            question="What is virtual assistance?",
+            language="om",
+        )
+        self.assertEqual(res["language"], "en")
+        self.assertEqual(res["requested_language"], "om")
+        self.assertEqual(res["provider"], "language-unavailable")
+        self.assertIn("English and Amharic", res["answer"])
+
+    def test_database_retrieval_does_not_use_mock_content_without_tenant(self):
+        service = AnswerGenerationService()
+        res = service.answer_question(
+            question="What is shaping the future of virtual assistant work?",
+            course_id="course-va-101",
+            language="en",
+        )
+        self.assertFalse(res["grounded"])
+        self.assertEqual(res["citations"], [])

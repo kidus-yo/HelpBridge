@@ -36,6 +36,8 @@ class LocalAIProvider(BaseAIProvider):
 
         if not evidence:
             return self._offline_fallback.generate(question, evidence, language=lang)
+        if not self.endpoint:
+            return self._offline_result(question, evidence, lang)
 
         evidence_text = "\n\n".join([
             f"[{c.get('section')}]: {c.get('text')}"
@@ -81,10 +83,18 @@ class LocalAIProvider(BaseAIProvider):
                     "citations": citations,
                     "provider": f"{self.name}:{self.model}"
                 }
-        except Exception:
-            pass
+        except (requests.RequestException, ValueError, KeyError, IndexError, TypeError):
+            logger.warning("Local provider request failed. Falling back to offline.")
 
         # Fallback to offline keyword provider
-        res = self._offline_fallback.generate(question, evidence, language=lang)
-        res['provider'] = f"{self.name} (fallback:offline)"
-        return res
+        return self._offline_result(question, evidence, lang)
+
+    def _offline_result(self, question, evidence, language):
+        result = self._offline_fallback.generate(
+            question,
+            evidence,
+            language=language,
+        )
+        result["fallback_used"] = True
+        result["provider"] = f"{self.name} (fallback:offline)"
+        return result

@@ -5,6 +5,8 @@ Serializers for Support Requests, Messages, and Screen-Share Operations.
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 from support.models import SupportRequest, SupportMessage
+from support.permissions import is_support_agent
+from chat.models import ChatSession
 
 
 class SupportMessageSerializer(serializers.ModelSerializer):
@@ -56,6 +58,8 @@ class SupportRequestDetailSerializer(serializers.ModelSerializer):
     assigned_agent_name = serializers.CharField(source='assigned_agent.username', read_only=True)
     messages = SupportMessageSerializer(many=True, read_only=True)
     accessibility_meta = serializers.SerializerMethodField()
+    guest_token = serializers.SerializerMethodField()
+    shared_chat_history = serializers.SerializerMethodField()
 
     class Meta:
         model = SupportRequest
@@ -75,6 +79,7 @@ class SupportRequestDetailSerializer(serializers.ModelSerializer):
             'learner_consent_chat_history',
             'screen_share_active',
             'guest_token',
+            'shared_chat_history',
             'messages',
             'created_at',
             'updated_at',
@@ -95,6 +100,40 @@ class SupportRequestDetailSerializer(serializers.ModelSerializer):
             'screen_sharing_status': "Active" if obj.screen_share_active else "Inactive",
             'language': obj.language,
         }
+
+    def get_guest_token(self, obj):
+        request = self.context.get("request")
+        if request and request.method == "POST":
+            return obj.guest_token
+        return ""
+
+    def get_shared_chat_history(self, obj):
+        request = self.context.get("request")
+        if (
+            not obj.learner_consent_chat_history
+            or not obj.chat_session_id
+            or not request
+            or not is_support_agent(request.user)
+        ):
+            return []
+
+        session = ChatSession.objects.filter(
+            id=obj.chat_session_id,
+            institution_id=str(obj.institution_id),
+        ).first()
+        if session is None:
+            return []
+        messages = list(session.messages.order_by("-created_at")[:20])
+        messages.reverse()
+        return [
+            {
+                "sender_type": message.sender_type,
+                "content": message.content,
+                "language": message.language,
+                "created_at": message.created_at,
+            }
+            for message in messages
+        ]
 
 
 class SupportRequestCreateSerializer(serializers.ModelSerializer):

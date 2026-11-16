@@ -33,19 +33,19 @@ def search_course_content(
     language: str | None = None,
     limit: int = 5,
 ) -> list[dict[str, Any]]:
-    if not query or not str(query).strip():
+    if not query or not str(query).strip() or not course_id:
         return []
     try:
-        Institution.objects.get(id=institution_id)
+        Institution.objects.get(id=institution_id, is_active=True)
     except Institution.DoesNotExist as exc:
         raise ValidationError({"institution_id": "Unknown institution."}) from exc
 
     qs = ContentChunk.objects.select_related("document", "course").filter(
         institution_id=institution_id,
+        course_id=course_id,
+        course__status="published",
         document__processing_status=KnowledgeDocument.ProcessingStatus.COMPLETED,
     )
-    if course_id:
-        qs = qs.filter(course_id=course_id)
     if language:
         qs = qs.filter(language=language)
     return _score_chunks(qs, query, limit)

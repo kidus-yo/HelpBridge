@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import BytesIO
+from zipfile import BadZipFile, ZipFile
+from xml.etree import ElementTree
 
 
 class ExtractionError(Exception):
@@ -11,8 +14,9 @@ class ExtractionError(Exception):
 
 @dataclass
 class ExtractedPage:
-    page_number: int
+    page_number: int | None
     text: str
+    section_heading: str = ""
 
 
 def extract_pages(content: bytes, document_type: str) -> list[ExtractedPage]:
@@ -24,7 +28,44 @@ def extract_pages(content: bytes, document_type: str) -> list[ExtractedPage]:
         return [ExtractedPage(page_number=1, text=text)]
     if document_type == "pdf":
         return _extract_pdf(content)
+    if document_type == "docx":
+        return _extract_docx(content)
     raise ExtractionError(f"Unsupported document type: {document_type}", "unsupported_type")
+
+
+def _extract_docx(content: bytes) -> list[ExtractedPage]:
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    document_path = "word/document.xml"
+    try:
+        with ZipFile(BytesIO(content)) as archive:
+            info = archive.getinfo(document_path)
+            if info.file_size > 50 * 1024 * 1024:
+                raise ExtractionError("DOCX document content is too large.", "docx_too_large")
+            root = ElementTree.fromstring(archive.read(document_path))
+    except ExtractionError:
+        raise
+    except (BadZipFile, KeyError, ElementTree.ParseError) as exc:
+        raise ExtractionError("The DOCX could not be read.", "invalid_docx") from exc
+
+    pages = []
+    heading = ""
+    for paragraph in root.findall(".//w:p", namespace):
+        text = "".join(
+            node.text or ""
+            for node in paragraph.findall(".//w:t", namespace)
+        ).strip()
+        if not text:
+            continue
+        style = paragraph.find("./w:pPr/w:pStyle", namespace)
+        style_id = style.get(f"{{{namespace['w']}}}val", "") if style is not None else ""
+        if style_id.startswith(("Heading", "Title", "Subtitle")):
+            heading = text[:255]
+            continue
+        pages.append(ExtractedPage(page_number=None, text=text, section_heading=heading))
+
+    if not pages:
+        raise ExtractionError("No extractable text was found in the DOCX.", "empty_docx")
+    return pages
 
 
 def _extract_pdf(content: bytes) -> list[ExtractedPage]:

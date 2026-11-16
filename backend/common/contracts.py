@@ -56,7 +56,8 @@ class MockKnowledgeRetrievalService:
         question: str,
         course_id: Optional[str] = None,
         language: str = 'en',
-        limit: int = 3
+        limit: int = 3,
+        institution_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Retrieves relevant course evidence chunks.

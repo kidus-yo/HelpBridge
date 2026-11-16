@@ -169,7 +169,7 @@ class AccommodationRequestListCreateView(generics.ListCreateAPIView):
         if user and user.is_authenticated:
             return AccommodationRequest.objects.filter(learner=user).select_related('job_listing')
 
-        token = self.request.headers.get('X-Guest-Token') or self.request.query_params.get('guest_token')
+        token = self.request.headers.get('X-Guest-Token')
         if token:
             return AccommodationRequest.objects.filter(guest_token=token).select_related('job_listing')
 
@@ -183,7 +183,7 @@ class AccommodationRequestListCreateView(generics.ListCreateAPIView):
     )
     def perform_create(self, serializer):
         user = self.request.user
-        token = self.request.headers.get('X-Guest-Token') or self.request.data.get('guest_token')
+        token = self.request.headers.get('X-Guest-Token') if not user.is_authenticated else ''
         if not user.is_authenticated and not token:
             token = secrets.token_urlsafe(32)
 
@@ -226,7 +226,7 @@ class JobAlertSubscriptionListCreateView(generics.ListCreateAPIView):
         if user and user.is_authenticated:
             return JobAlertSubscription.objects.filter(learner=user)
 
-        token = self.request.headers.get('X-Guest-Token') or self.request.query_params.get('guest_token')
+        token = self.request.headers.get('X-Guest-Token')
         if token:
             return JobAlertSubscription.objects.filter(guest_token=token)
 
@@ -240,7 +240,7 @@ class JobAlertSubscriptionListCreateView(generics.ListCreateAPIView):
     )
     def perform_create(self, serializer):
         user = self.request.user
-        token = self.request.headers.get('X-Guest-Token') or self.request.data.get('guest_token')
+        token = self.request.headers.get('X-Guest-Token') if not user.is_authenticated else ''
         if not user.is_authenticated and not token:
             token = secrets.token_urlsafe(32)
 

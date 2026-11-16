@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HelpBridge widget demo</title>
+</head>
+<body>
+  <main>
+    <h1>HelpBridge widget demo</h1>
+    <p>
+      Use a short-lived context token issued by a trusted host server. Do not
+      paste an integration API key or signing secret here.
+    </p>
+    <form id="widget-demo-form">
+      <p>
+        <label for="api-url">HelpBridge API origin</label><br>
+        <input id="api-url" name="api" type="url" value="http://localhost:8000" required>
+      </p>
+      <p>
+        <label for="context-token">Short-lived platform context token</label><br>
+        <input id="context-token" name="token" type="password" autocomplete="off" required>
+      </p>
+      <p>
+        <label for="language">Widget language</label><br>
+        <select id="language" name="language">
+          <option value="en">English</option>
+          <option value="am">Amharic</option>
+        </select>
+      </p>
+      <button type="submit">Load widget</button>
+    </form>
+    <p id="demo-status" role="status" aria-live="polite"></p>
+  </main>
+  <script src="demo.js" defer></script>
+</body>
+</html>

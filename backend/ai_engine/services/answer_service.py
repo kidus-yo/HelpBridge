@@ -6,7 +6,8 @@ and Section 7.5 (Suggested normalized AI answer) of the handbook.
 
 from typing import List, Dict, Any, Optional
 from django.conf import settings
-from common.contracts import MockKnowledgeRetrievalService
+from django.db import DatabaseError
+from common.languages import is_supported_tutor_language
 from ai_engine.providers.base import BaseAIProvider
 from ai_engine.providers.offline import OfflineKeywordProvider
 from ai_engine.providers.cloud import CloudAIProvider
@@ -17,10 +18,11 @@ from ai_engine.services.prompt_templates import REFUSALS, HUMAN_HELP_PROMPT
 from knowledge.services.retrieval import search_course_content
 
 
-class DatabaseKnowledgeRetrievalService:
-    def __init__(self, fallback_service: Optional[MockKnowledgeRetrievalService] = None):
-        self.fallback_service = fallback_service or MockKnowledgeRetrievalService()
+class KnowledgeRetrievalUnavailable(Exception):
+    """Raised when the tenant knowledge store cannot be queried safely."""
 
+
+class DatabaseKnowledgeRetrievalService:
     def search(
         self,
         question: str,
@@ -31,30 +33,20 @@ class DatabaseKnowledgeRetrievalService:
     ) -> List[Dict[str, Any]]:
         if not question or not question.strip():
             return []
-
-        if institution_id is not None:
-            try:
-                return search_course_content(
-                    institution_id=institution_id,
-                    query=question,
-                    course_id=course_id,
-                    language=language,
-                    limit=limit,
-                )
-            except Exception:  # pragma: no cover - defensive guard at the boundary
-                return self.fallback_service.search(
-                    question=question,
-                    course_id=course_id,
-                    language=language,
-                    limit=limit,
-                )
-
-        return self.fallback_service.search(
-            question=question,
-            course_id=course_id,
-            language=language,
-            limit=limit,
-        )
+        if institution_id is None or course_id is None:
+            return []
+        try:
+            return search_course_content(
+                institution_id=institution_id,
+                query=question,
+                course_id=course_id,
+                language=language,
+                limit=limit,
+            )
+        except DatabaseError as exc:
+            raise KnowledgeRetrievalUnavailable(
+                "Tenant knowledge retrieval is unavailable."
+            ) from exc
 
 
 class AnswerGenerationService:
@@ -97,7 +89,21 @@ class AnswerGenerationService:
         3. If evidence found above threshold -> Generate grounded answer.
         4. If evidence not found -> Return FAQ or honest refusal.
         """
-        lang = 'am' if language == 'am' else 'en'
+        if not is_supported_tutor_language(language):
+            return {
+                "answer": (
+                    "Tutor replies are currently available in English and Amharic. "
+                    "Please select one of these languages."
+                ),
+                "language": "en",
+                "requested_language": language,
+                "grounded": False,
+                "fallback_used": False,
+                "citations": [],
+                "provider": "language-unavailable",
+            }
+
+        lang = language
         clean_q = (question or '').strip()
 
         if not clean_q:
@@ -113,6 +119,16 @@ class AnswerGenerationService:
         # Check FAQ fallback first
         faq_match = self.faq_service.match(clean_q, language=lang)
 
+        # Platform-help FAQs do not need course retrieval.
+        support_keywords = [
+            'human', 'talk', 'language', 'switch', 'change', 'interview',
+            'accommodation', 'accessibility', 'screen', 'reader', 'keyboard',
+            'ሰው', 'አስተማሪ', 'ቋንቋ', 'መቀየር', 'ድጋፍ', 'ስክሪን', 'ኪቦርድ',
+        ]
+        is_support_intent = any(k in clean_q.lower() for k in support_keywords)
+        if faq_match and is_support_intent:
+            return faq_match
+
         # Retrieval for course content
         evidence = self.retrieval_service.search(
             question=clean_q,
@@ -126,13 +142,6 @@ class AnswerGenerationService:
             evidence and evidence[0].get('relevance', 0) >= self.threshold
         )
 
-        # Priority resolution: If query explicitly asks about human help or language change, FAQ wins
-        support_keywords = ['human', 'talk', 'language', 'switch', 'change', 'interview', 'accommodation', 'ሰው', 'አስተማሪ', 'ቋንቋ', 'መቀየር', 'ድጋፍ']
-        is_support_intent = any(k in clean_q.lower() for k in support_keywords)
-
-        if faq_match and is_support_intent:
-            return faq_match
-
         # Generate grounded answer from evidence
         if is_sufficient_evidence:
             provider = self._get_provider(provider_name)
@@ -143,9 +152,6 @@ class AnswerGenerationService:
                 conversation_context=conversation_context
             )
             return result
-
-        if faq_match:
-            return faq_match
 
         # Honest refusal (No fabricated citations, no hallucinations)
         refusal_msg = REFUSALS[lang] + HUMAN_HELP_PROMPT[lang]

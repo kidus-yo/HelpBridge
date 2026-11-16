@@ -33,7 +33,7 @@ class IsAccommodationOwnerOrStaff(permissions.BasePermission):
         if request.user and request.user.is_authenticated and obj.learner == request.user:
             return True
 
-        token = request.headers.get('X-Guest-Token') or request.query_params.get('guest_token')
+        token = request.headers.get('X-Guest-Token')
         if token and obj.guest_token and token == obj.guest_token:
             return True
 
@@ -50,7 +50,7 @@ class IsSubscriptionOwner(permissions.BasePermission):
             if request.user.is_staff or obj.learner == request.user:
                 return True
 
-        token = request.headers.get('X-Guest-Token') or request.query_params.get('guest_token')
+        token = request.headers.get('X-Guest-Token')
         if token and obj.guest_token and token == obj.guest_token:
             return True
 

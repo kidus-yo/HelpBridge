@@ -1,4 +1,5 @@
 from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -69,6 +70,61 @@ class DocumentProcessingTests(TestCase):
         chunk = ContentChunk.objects.get(document_id=uploaded.data["id"])
         self.assertEqual(chunk.page_number, 1)
         self.assertIn("HelpBridge", chunk.chunk_text)
+
+    def test_docx_upload_extracts_heading_and_body_text(self):
+        document_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Lesson Heading</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Virtual assistants use digital tools to work remotely with clients.</w:t></w:r></w:p>
+          </w:body>
+        </w:document>"""
+        buffer = BytesIO()
+        with ZipFile(buffer, "w", ZIP_DEFLATED) as archive:
+            archive.writestr("word/document.xml", document_xml)
+        payload = SimpleUploadedFile(
+            "lesson.docx",
+            buffer.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        uploaded = self.client.post(
+            "/api/v1/documents/",
+            {"file": payload, "language": "en"},
+            format="multipart",
+        )
+        self.assertEqual(uploaded.status_code, 201, uploaded.data)
+        self.assertEqual(uploaded.data["document_type"], "docx")
+        processed = self.client.post(f"/api/v1/documents/{uploaded.data['id']}/process/")
+        self.assertEqual(processed.status_code, 200, processed.data)
+        chunk = ContentChunk.objects.get(document_id=uploaded.data["id"])
+        self.assertIn("Virtual assistants", chunk.chunk_text)
+        self.assertEqual(chunk.section_heading, "Lesson Heading")
+        self.assertIsNone(chunk.page_number)
+
+    def test_corrupted_docx_and_mismatched_mime_are_rejected(self):
+        corrupted = SimpleUploadedFile(
+            "lesson.docx",
+            b"not a zip file",
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        invalid_docx = self.client.post(
+            "/api/v1/documents/",
+            {"file": corrupted},
+            format="multipart",
+        )
+        self.assertEqual(invalid_docx.status_code, 400)
+
+        mismatched = SimpleUploadedFile(
+            "lesson.docx",
+            b"plain text",
+            content_type="text/plain",
+        )
+        invalid_mime = self.client.post(
+            "/api/v1/documents/",
+            {"file": mismatched},
+            format="multipart",
+        )
+        self.assertEqual(invalid_mime.status_code, 400)
 
     def test_rejects_unsupported_type_and_oversize(self):
         exe = SimpleUploadedFile("payload.exe", b"MZ", content_type="application/octet-stream")

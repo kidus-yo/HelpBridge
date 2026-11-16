@@ -2,9 +2,12 @@
 Tests for Pluggable AI Providers (Offline, Cloud, Local, Mock).
 """
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from unittest.mock import patch
+import requests
 from ai_engine.providers.offline import OfflineKeywordProvider
 from ai_engine.providers.cloud import CloudAIProvider
+from ai_engine.providers.local import LocalAIProvider
 from ai_engine.providers.mock import MockAIProvider
 
 
@@ -55,3 +58,28 @@ class ProviderTests(TestCase):
         )
         self.assertTrue(res['grounded'])
         self.assertIn("fallback:offline", res['provider'])
+        self.assertTrue(res["fallback_used"])
+
+    @patch("ai_engine.providers.cloud.requests.post", side_effect=requests.Timeout)
+    def test_cloud_provider_failure_is_reported_as_offline_fallback(self, post):
+        provider = CloudAIProvider(api_key="test-key")
+        res = provider.generate(
+            question="Tell me about remote work for VAs",
+            evidence=self.evidence,
+            language="en",
+        )
+        self.assertTrue(res["grounded"])
+        self.assertTrue(res["fallback_used"])
+        self.assertIn("fallback:offline", res["provider"])
+
+    @override_settings(AI_LOCAL_ENDPOINT="")
+    def test_local_provider_without_endpoint_reports_offline_fallback(self):
+        provider = LocalAIProvider(endpoint="")
+        res = provider.generate(
+            question="Tell me about remote work for VAs",
+            evidence=self.evidence,
+            language="en",
+        )
+        self.assertTrue(res["grounded"])
+        self.assertTrue(res["fallback_used"])
+        self.assertIn("fallback:offline", res["provider"])

@@ -7,13 +7,14 @@
 ## What It Does
 Digital Bridge Assistant is a lightweight, accessible learner-support plugin for existing learning management platforms, starting with ALX Savanna. It provides:
 1. **Evidence-grounded course tutoring** in Amharic and English, citing actual lesson sections and refusing to hallucinate when evidence is missing.
-2. **Unified communication channels:** Web widget, Telegram bot, and low-bandwidth SMS on a single central Django intelligence backend with offline keyword and curated FAQ fallbacks.
-3. **One-click human escalation & live help:** Learner-controlled handoff to human support agents with explicit chat consent boundaries, learner-controlled screen sharing, and low-bandwidth screen snapshot fallback.
-4. **Career Gateway & Accommodations:** Search and grounded Q&A for job opportunities, interview accommodation requests requiring **zero medical diagnoses**, and outbound job alert notifications via Telegram and 160-char SMS.
+2. **Unified communication channels:** Web widget, Telegram bot, and authenticated low-bandwidth SMS can use the central, tenant-scoped chat workflow when configured.
+3. **Human support requests:** Learner-controlled handoff with explicit chat-history consent. No screen-sharing provider is currently configured.
+4. **Career Gateway & Accommodations:** Job search and Q&A, privacy-first interview accommodation requests, and job-alert subscriptions. Telegram delivery requires a bot token; outbound SMS delivery is not implemented.
 
 ---
 
-## The Main Tasks We Tested
+## Target User Scenarios
+These are project goals; assistive-technology and external-provider verification remains outstanding.
 > *"A blind or low-connectivity learner asks a course question in Amharic or English via Telegram or low-bandwidth SMS, receives an evidence-grounded answer citing the exact lesson section, and has an immediate route to human escalation if the material cannot verify the answer."*
 >
 > *"A learner encounters an accessibility barrier or complex problem on a Savanna course page, escalates to a human agent with one click, controls screen sharing with a persistent stop control, and discovers accessible job opportunities with private interview accommodations."*
@@ -24,22 +25,19 @@ Digital Bridge Assistant is a lightweight, accessible learner-support plugin for
 
 ### Option A: Local Development Environment
 ```bash
-# 1. Clone & switch to feature branch
-git checkout feature/yensew-support-careers
-
-# 2. Activate virtual environment
+# Activate virtual environment
 source .venv/bin/activate
 
-# 3. Apply migrations
+# Apply migrations
 python backend/manage.py migrate
 
-# 4. Seed demo data (Support tickets, Ethiopian jobs, accommodations, subscriptions)
+# Optional demo seed data
 python backend/manage.py seed_careers_and_support
 
-# 5. Run automated tests (45 unit & integration tests)
+# Run automated tests
 pytest
 
-# 6. Start the backend development server
+# Start the backend development server
 python backend/manage.py runserver 0.0.0.0:8000
 ```
 - Interactive Swagger UI: [http://localhost:8000/docs/](http://localhost:8000/docs/)
@@ -55,7 +53,9 @@ Open [http://localhost:8000/docs/](http://localhost:8000/docs/) in your browser.
 ### Option C: Run Telegram Bot (Long-Polling Mode for Demo Laptops)
 To demonstrate the Telegram bot without needing a public IP or webhook tunnel:
 ```bash
-# Add your BotFather token to .env: TELEGRAM_BOT_TOKEN=...
+# Configure TELEGRAM_BOT_TOKEN, CHANNEL_PLATFORM_INTEGRATION_ID, and
+# CHANNEL_DEFAULT_COURSE_ID in .env. The integration must be active and the
+# course published; upload and process course materials before asking questions.
 python backend/manage.py run_telegram_bot
 ```
 
@@ -66,9 +66,13 @@ python backend/manage.py run_telegram_bot
 The widget can be added to any HTML or LMS page with a single script tag:
 ```html
 <!-- Digital Bridge Assistant Web Component -->
-<script src="http://localhost:8000/static/widget/bridge.js" defer></script>
+<script src="http://localhost:8000/static/widget/bridge.js"
+        data-context-token="SHORT_LIVED_TOKEN_FROM_HOST_SERVER" defer></script>
 <db-assistant lang="am" api="http://localhost:8000"></db-assistant>
 ```
+The host LMS server must mint and refresh the short-lived token; never embed an integration API key or signing secret in the browser. See [platform integration](docs/platform-integration.md).
+For cross-origin embeds, add the LMS page's exact origin to `CORS_ALLOWED_ORIGINS`; see [backend setup](docs/backend-setup.md).
+To preview the widget against seeded bilingual course content, follow the [local demo and Savanna walkthrough](docs/platform-integration.md).
 
 ---
 
@@ -93,8 +97,10 @@ curl -X GET http://localhost:8000/api/v1/ai/status/
 ```
 
 ### 2. Generate Grounded Course Answer (Amharic)
+First obtain a short-lived course context token from the host platform server (see [platform integration](docs/platform-integration.md)). The AI answer endpoint requires that token:
 ```bash
 curl -X POST http://localhost:8000/api/v1/ai/answer/ \
+  -H "Authorization: Bearer SHORT_LIVED_CONTEXT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "question": "ሰው ሰራሽ አስተውሎት AI የቨርቹዋል ረዳቶችን ሥራ እንዴት ይቀርጸዋል?",
@@ -105,6 +111,7 @@ curl -X POST http://localhost:8000/api/v1/ai/answer/ \
 ### 3. Generate Grounded Course Answer (English)
 ```bash
 curl -X POST http://localhost:8000/api/v1/ai/answer/ \
+  -H "Authorization: Bearer SHORT_LIVED_CONTEXT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "question": "What is shaping the future of virtual assistant work?",
@@ -115,6 +122,7 @@ curl -X POST http://localhost:8000/api/v1/ai/answer/ \
 ### 4. Low-Bandwidth SMS Inbound Route (<= 160 Characters)
 ```bash
 curl -X POST http://localhost:8000/sms/inbound \
+  -H "X-SMS-Gateway-Key: CONFIGURED_SMS_GATEWAY_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "from": "0911223344",
@@ -127,8 +135,10 @@ According to course section «What is Shaping the Future of VA Work?»: More rem
 ```
 
 ### 5. Outbound Job Alert Notification Dispatch (Contract for Yensew)
+This server-to-server endpoint requires a staff session or an integration API key with the `notifications:send` scope. SMS outbound delivery is not implemented yet and returns a failed delivery record / HTTP 503; Telegram requires a configured bot token.
 ```bash
 curl -X POST http://localhost:8000/api/v1/channels/notifications/send/ \
+  -H "Authorization: Api-Key SERVER_SIDE_INTEGRATION_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "recipient": "0911223344",

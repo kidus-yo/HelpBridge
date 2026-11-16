@@ -8,7 +8,6 @@ Implements the contract agreed in Section 7.4 (Samuel <-> Yensew) of the handboo
 
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime, timezone
 from channels.models import MessageDelivery
 from channels.sms.adapter import SMSAdapter
 from channels.telegram.client import TelegramClient
@@ -38,7 +37,7 @@ class NotificationDeliveryService:
         elif ch == 'telegram':
             client = TelegramClient()
             resp = client.send_message(chat_id=recipient, text=full_text)
-            status = 'delivered' if resp.get('ok') else 'failed'
+            status = 'sent' if resp.get('ok') else 'failed'
             err_msg = resp.get('error')
 
             delivery = MessageDelivery.objects.create(
@@ -47,7 +46,6 @@ class NotificationDeliveryService:
                 content=full_text,
                 status=status,
                 error_message=err_msg,
-                delivered_at=datetime.now(timezone.utc) if status == 'delivered' else None
             )
 
             return {
