@@ -133,11 +133,15 @@ class TelegramBotHandler:
                 "📖 **የዲጂታል ብሪጅ ረዳት አጠቃቀም መመሪያ**\n\n"
                 "• ጥያቄዎን በጽሑፍ ይላኩ፤ ረዳቱ ከትክክለኛ የኮርሱ ይዘት አመሳክሮ መልስ ይሰጣል።\n"
                 "• ቋንቋ ለመቀየር `/language` ይላኩ።\n"
+                "• ክፍት የሥራ ዕድሎችን ለማየት `/jobs` ይላኩ።\n"
+                "• አዳዲስ የሥራ ማስታወቂያዎች በቴሌግራም እንዲደርስዎት `/subscribe` ይላኩ።\n"
                 "• ከሰው አስተማሪ ጋር ለመገናኘት 'ከሰው ጋር ተነጋገር' ማለት ይችላሉ።"
                 if lang == 'am' else
                 "📖 **Digital Bridge Assistant Help**\n\n"
                 "• Text any course question; the assistant answers using grounded course evidence.\n"
                 "• Type `/language` anytime to change language.\n"
+                "• Type `/jobs` to view latest accessible job opportunities.\n"
+                "• Type `/subscribe` to receive real-time job alerts in Telegram.\n"
                 "• If an answer cannot be found, you can request human assistance."
             )
             self.client.send_message(chat_id=chat_id, text=help_text)

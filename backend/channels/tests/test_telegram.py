@@ -182,3 +182,58 @@ class TelegramBotTests(TestCase):
             content_type="application/json"
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_jobs_command_lists_published_jobs(self):
+        from careers.models import JobListing
+        JobListing.objects.create(
+            title="Accessibility Specialist",
+            organization="ALX",
+            location="Addis Ababa",
+            status="published"
+        )
+        update = {
+            "update_id": 1005,
+            "message": {
+                "message_id": 4,
+                "chat": {"id": 12345678},
+                "from": {"id": 12345678},
+                "text": "/jobs"
+            }
+        }
+        res = self.bot.handle_update(update)
+        self.assertTrue(res['ok'])
+        self.assertEqual(res['action'], 'jobs_list')
+        last_msg = self.mock_client.sent_messages[-1]
+        self.assertIn("Accessibility Specialist", last_msg['text'])
+
+    def test_subscribe_and_unsubscribe_commands(self):
+        from careers.models import JobAlertSubscription
+        # 1. Subscribe
+        sub_update = {
+            "update_id": 1006,
+            "message": {
+                "message_id": 5,
+                "chat": {"id": 99999999},
+                "from": {"id": 99999999},
+                "text": "/subscribe"
+            }
+        }
+        res_sub = self.bot.handle_update(sub_update)
+        self.assertTrue(res_sub['ok'])
+        self.assertEqual(res_sub['action'], 'subscribe')
+        self.assertTrue(JobAlertSubscription.objects.filter(channel='telegram', contact_identity='99999999', is_active=True).exists())
+
+        # 2. Unsubscribe
+        unsub_update = {
+            "update_id": 1007,
+            "message": {
+                "message_id": 6,
+                "chat": {"id": 99999999},
+                "from": {"id": 99999999},
+                "text": "/unsubscribe"
+            }
+        }
+        res_unsub = self.bot.handle_update(unsub_update)
+        self.assertTrue(res_unsub['ok'])
+        self.assertEqual(res_unsub['action'], 'unsubscribe')
+        self.assertFalse(JobAlertSubscription.objects.get(channel='telegram', contact_identity='99999999').is_active)

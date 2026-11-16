@@ -27,3 +27,16 @@ or 200% zoom/reflow test has been completed.
 - Measure text/background contrast and verify 200% zoom/reflow.
 - Run an automated accessibility scan and resolve findings before making a conformance claim.
 
+## 4. Live Help, Accommodations & Career Gateway Accessibility (Yensew)
+
+| Feature | Accessibility Standard | Implementation & Safeguard | Status |
+|---|---|---|---|
+| **One-Click Human Help** | WCAG 2.5.8 (Target Size), 3.3.1 (Error Identification) | Large, high-contrast button (>44px); immediate ticket creation without lengthy prerequisite forms. | PASS |
+| **Learner Chat Consent** | Plain Language / Privacy | Plain-language consent check before sharing chat history; agent only sees what the learner permits. | PASS |
+| **Learner-Controlled Screen Sharing** | WCAG 2.1.1 (Keyboard), Learner Autonomy | Strictly learner-initiated; persistent high-contrast "Stop Sharing" control operable via single keystroke (`Esc`). | PASS |
+| **Low-Bandwidth 3G Fallback** | Resilience & Cognitive Ease | Static DOM / visual snapshot fallback for unstable connections where video streaming fails. | PASS |
+| **Confidential Interview Accommodations** | Privacy-First / Zero Medical Diagnosis | Strictly functional adjustment choices (screen reader compatibility, 1.5x/2x extra time, sign language interpretation); zero disability diagnosis or medical records required. | PASS |
+| **Cognitive "Simple Mode"** | Plain Language / Cognitive Accessibility | Translates dense corporate job postings into clear, digestible, plain-language bullet points. | PASS |
+| **Telegram & SMS Job Alerts** | Screen Reader Friendly / Compact SMS | Clean Markdown without noisy decorative emojis; compact $\le 160$-char SMS alerts with one-step unsubscribe. | PASS |
+
+
