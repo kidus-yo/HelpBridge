@@ -1,18 +1,14 @@
 import uuid
 from django.db import models
 from django.conf import settings
+from common.languages import LANGUAGE_CHOICES
 from chat.models import ChatSession
 
 class AccessibilityPreference(models.Model):
-    LANGUAGE_CHOICES = [
-        ('en', 'English'),
-        ('am', 'Amharic'),
-    ]
-
     TEXT_SIZE_CHOICES = [
         ('normal', 'Normal'),
         ('large', 'Large'),
-        ('x-large', 'Extra Large'),
+        ('xlarge', 'Extra Large'),
     ]
 
     TEXT_DIRECTION_CHOICES = [

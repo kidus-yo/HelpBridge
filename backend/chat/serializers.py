@@ -1,5 +1,6 @@
 import uuid
 from rest_framework import serializers
+from common.languages import LANGUAGE_CHOICES
 from .models import ChatSession, Message
 
 class MessageSerializer(serializers.ModelSerializer):
@@ -21,14 +22,14 @@ class ChatSessionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'messages_count']
 
 class CreateChatSessionSerializer(serializers.Serializer):
-    institution_id = serializers.CharField(required=False, allow_null=True, default='inst-default')
-    course_id = serializers.CharField(required=False, allow_null=True, default='course-va-101')
+    institution_id = serializers.CharField(required=False, allow_null=True)
+    course_id = serializers.CharField(required=False, allow_null=True)
     channel = serializers.ChoiceField(choices=['web', 'telegram', 'sms'], default='web')
-    preferred_language = serializers.ChoiceField(choices=['en', 'am'], default='en')
+    preferred_language = serializers.ChoiceField(choices=LANGUAGE_CHOICES, required=False)
 
 class SendMessageSerializer(serializers.Serializer):
     content = serializers.CharField(max_length=4000, required=True, allow_blank=False)
-    language = serializers.ChoiceField(choices=['en', 'am'], required=False, allow_null=True)
+    language = serializers.ChoiceField(choices=LANGUAGE_CHOICES, required=False, allow_null=True)
 
     def validate_content(self, value):
         stripped = value.strip()

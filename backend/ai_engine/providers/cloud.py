@@ -46,9 +46,7 @@ class CloudAIProvider(BaseAIProvider):
         # If no API key configured, use offline provider directly
         if not self.api_key:
             logger.info("No AI_CLOUD_API_KEY provided; utilizing offline keyword provider.")
-            res = self._offline_fallback.generate(question, evidence, language=lang)
-            res['provider'] = f"{self.name} (fallback:offline)"
-            return res
+            return self._offline_result(question, evidence, lang)
 
         # Build evidence context block
         evidence_text = "\n\n".join([
@@ -118,12 +116,18 @@ class CloudAIProvider(BaseAIProvider):
                 }
             else:
                 logger.warning("Cloud provider returned HTTP %s. Falling back to offline.", resp.status_code)
-                res = self._offline_fallback.generate(question, evidence, language=lang)
-                res['provider'] = f"{self.name} (fallback:offline)"
-                return res
+                return self._offline_result(question, evidence, lang)
 
-        except Exception as err:
-            logger.error("Cloud provider error: %s. Falling back to offline provider.", str(err))
-            res = self._offline_fallback.generate(question, evidence, language=lang)
-            res['provider'] = f"{self.name} (fallback:offline)"
-            return res
+        except (requests.RequestException, ValueError, KeyError, IndexError, TypeError):
+            logger.warning("Cloud provider request failed. Falling back to offline.")
+            return self._offline_result(question, evidence, lang)
+
+    def _offline_result(self, question, evidence, language):
+        result = self._offline_fallback.generate(
+            question,
+            evidence,
+            language=language,
+        )
+        result["fallback_used"] = True
+        result["provider"] = f"{self.name} (fallback:offline)"
+        return result

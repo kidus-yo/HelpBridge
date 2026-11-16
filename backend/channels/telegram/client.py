@@ -28,8 +28,7 @@ class TelegramClient:
     ) -> Dict[str, Any]:
         """Send message to a Telegram chat."""
         if not self.is_configured:
-            logger.info("[MOCK Telegram] send_message to %s: %s", chat_id, text[:60])
-            return {"ok": True, "result": {"message_id": 99999, "text": text}}
+            return {"ok": False, "error": "telegram_not_configured"}
 
         url = f"{self.base_url}/sendMessage"
         payload = {
@@ -43,9 +42,9 @@ class TelegramClient:
         try:
             resp = requests.post(url, json=payload, timeout=10)
             return resp.json()
-        except Exception as err:
-            logger.error("Failed to send Telegram message: %s", err)
-            return {"ok": False, "error": str(err)}
+        except (requests.RequestException, ValueError):
+            logger.warning("Telegram send request failed.")
+            return {"ok": False, "error": "telegram_request_failed"}
 
     def get_updates(self, offset: Optional[int] = None, timeout: int = 25) -> List[Dict[str, Any]]:
         """Long polling updates fetcher for local laptop development."""
@@ -62,18 +61,18 @@ class TelegramClient:
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get("result", [])
-        except Exception as err:
-            logger.error("Error polling Telegram updates: %s", err)
+        except (requests.RequestException, ValueError):
+            logger.warning("Telegram polling request failed.")
         return []
 
     def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None) -> Dict[str, Any]:
         if not self.is_configured:
-            return {"ok": True}
+            return {"ok": False, "error": "telegram_not_configured"}
         url = f"{self.base_url}/answerCallbackQuery"
         payload = {"callback_query_id": callback_query_id}
         if text:
             payload["text"] = text
         try:
             return requests.post(url, json=payload, timeout=5).json()
-        except Exception:
-            return {"ok": False}
+        except (requests.RequestException, ValueError):
+            return {"ok": False, "error": "telegram_request_failed"}

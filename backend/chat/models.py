@@ -1,17 +1,13 @@
 import uuid
 from django.db import models
 from django.conf import settings
+from common.languages import LANGUAGE_CHOICES
 
 class ChatSession(models.Model):
     CHANNEL_CHOICES = [
         ('web', 'Web Widget'),
         ('telegram', 'Telegram'),
         ('sms', 'SMS / Text'),
-    ]
-
-    LANGUAGE_CHOICES = [
-        ('en', 'English'),
-        ('am', 'Amharic'),
     ]
 
     STATUS_CHOICES = [
@@ -29,6 +25,8 @@ class ChatSession(models.Model):
     )
     institution_id = models.CharField(max_length=255, blank=True, null=True, default='inst-default')
     course_id = models.CharField(max_length=255, blank=True, null=True, default='course-va-101')
+    platform_integration_id = models.UUIDField(null=True, blank=True, db_index=True)
+    platform_user_ref = models.CharField(max_length=128, blank=True, default="")
     channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='web')
     preferred_language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default='en')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')

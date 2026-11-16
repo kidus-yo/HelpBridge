@@ -16,9 +16,9 @@
     return scripts[scripts.length - 1];
   })();
 
-  const API_BASE = (currentScript && currentScript.getAttribute('data-api')) || 'http://localhost:8000';
-  const COURSE_ID = (currentScript && currentScript.getAttribute('data-course')) || 'course-va-101';
-  const INSTITUTION_ID = (currentScript && currentScript.getAttribute('data-institution')) || 'inst-default';
+  const SCRIPT_URL = currentScript && currentScript.src ? new URL(currentScript.src, window.location.href) : null;
+  const API_BASE = (currentScript && currentScript.getAttribute('data-api')) || (SCRIPT_URL && SCRIPT_URL.origin) || '';
+  const CONTEXT_TOKEN = (currentScript && currentScript.getAttribute('data-context-token')) || '';
   const INITIAL_LANG = (currentScript && currentScript.getAttribute('data-lang')) || 'en';
 
   // State
@@ -71,7 +71,10 @@
       cancel: 'Cancel',
       offlineFaqBadge: 'Offline FAQ',
       groundedBadge: 'Verified Course Material',
-      errorNetwork: 'Unable to reach the assistant server. Operating in offline mode.',
+      errorNetwork: 'Unable to reach the assistant server. Please try again or request human help.',
+      contextMissing: 'A secure platform context is required. Please reload this page from your learning platform.',
+      supportSubmitted: 'Your human-support request was submitted.',
+      supportUnavailable: 'Unable to submit your support request. Please try again.',
       voiceInput: 'Voice input (Dictate)',
       voiceUnsupported: 'Speech recognition is not supported on this browser. Please type your message.',
       liveNewMessagePrefix: 'New message from'
@@ -110,7 +113,10 @@
       cancel: 'ሰርዝ',
       offlineFaqBadge: 'ከመስመር ውጭ FAQ',
       groundedBadge: 'የተረጋገጠ የኮርስ ሰነድ',
-      errorNetwork: 'ከአገልጋዩ ጋር መገናኘት አልተቻለም። ከመስመር ውጭ ሁነታ ላይ ይገኛል።',
+      errorNetwork: 'ከአገልጋዩ ጋር መገናኘት አልተቻለም። እባክዎ እንደገና ይሞክሩ ወይም የሰው ድጋፍ ይጠይቁ።',
+      contextMissing: 'የደህንነት መድረክ አውድ ያስፈልጋል። እባክዎ ከትምህርት መድረኩ ገጹን እንደገና ይክፈቱ።',
+      supportSubmitted: 'የሰው ድጋፍ ጥያቄዎ ተልኳል።',
+      supportUnavailable: 'የድጋፍ ጥያቄዎን መላክ አልተቻለም። እባክዎ እንደገና ይሞክሩ።',
       voiceInput: 'በድምፅ መልዕክት አስገባ',
       voiceUnsupported: 'ይህ አሳሽ ድምፅን ወደ ጽሑፍ መቀየር አይደግፍም። እባክዎ በጽሑፍ ያስገቡ።',
       liveNewMessagePrefix: 'አዲስ መልዕክት ከ'
@@ -705,11 +711,16 @@
             <span class="db-badge-grounded">✓ ${t('groundedBadge')}</span>
             <div style="margin-top: 4px;">
               <strong>${t('citationsTitle')}</strong>
-              ${citations.map(c => `
-                <span class="db-citation-item" title="${c.document_title} - ${c.section}">
-                  📄 ${c.document_title}${c.page ? ` (${t('page')} ${c.page})` : ''}
-                </span>
-              `).join('')}
+              ${citations.map(c => {
+                const title = escapeHtml(c.document_title);
+                const section = escapeHtml(c.section);
+                const page = escapeHtml(c.page);
+                return `
+                  <span class="db-citation-item" title="${title} - ${section}">
+                    📄 ${title}${c.page ? ` (${t('page')} ${page})` : ''}
+                  </span>
+                `;
+              }).join('')}
             </div>
           </div>
         `;
@@ -718,7 +729,7 @@
       return `
         <div class="db-message ${isLearner ? 'db-message-learner' : (isAgent ? 'db-message-agent' : 'db-message-assistant')}">
           ${isAgent ? '<div style="font-size: 0.75rem; font-weight: 700; margin-bottom: 2px;">Support Agent:</div>' : ''}
-          <div>${escapeHtml(msg.content)}</div>
+          <div dir="auto">${escapeHtml(msg.content)}</div>
           ${citationsHtml}
         </div>
       `;
@@ -726,8 +737,16 @@
   }
 
   function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function authHeaders(extra) {
+    if (!CONTEXT_TOKEN) throw new Error(t('contextMissing'));
+    return Object.assign(
+      { 'Authorization': `Bearer ${CONTEXT_TOKEN}` },
+      extra || {}
+    );
   }
 
   function announce(text) {
@@ -766,16 +785,19 @@
   // Session & Accessibility API Communication
   async function initSession() {
     try {
+      if (!CONTEXT_TOKEN) {
+        messages.push({ sender_type: 'assistant', content: t('contextMissing') });
+        render();
+        return false;
+      }
       const payload = {
         channel: 'web',
-        preferred_language: currentLang,
-        course_id: COURSE_ID,
-        institution_id: INSTITUTION_ID
+        preferred_language: currentLang
       };
 
       const res = await fetch(`${API_BASE}/api/v1/chat/sessions/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       });
 
@@ -783,16 +805,24 @@
         const data = await res.json();
         sessionId = data.id;
         loadAccessibilityPreferences();
+        return true;
       }
+      messages.push({ sender_type: 'assistant', content: t('errorNetwork') });
+      render();
+      return false;
     } catch (err) {
-      // Operates gracefully with default settings if offline
+      messages.push({ sender_type: 'assistant', content: err.message || t('errorNetwork') });
+      render();
+      return false;
     }
   }
 
   async function loadAccessibilityPreferences() {
     if (!sessionId) return;
     try {
-      const res = await fetch(`${API_BASE}/api/v1/accessibility/preferences/${sessionId}/`);
+      const res = await fetch(`${API_BASE}/api/v1/accessibility/preferences/${sessionId}/`, {
+        headers: authHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         simpleMode = !!data.simple_mode;
@@ -824,7 +854,7 @@
     try {
       await fetch(`${API_BASE}/api/v1/accessibility/preferences/${sessionId}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(patchData)
       });
     } catch (e) {
@@ -846,17 +876,23 @@
     scrollMessagesToBottom();
 
     try {
-      if (!sessionId) await initSession();
+      if (!sessionId && !(await initSession())) return;
 
       const res = await fetch(`${API_BASE}/api/v1/chat/sessions/${sessionId}/messages/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ content: trimmed, language: currentLang })
       });
 
       if (res.ok) {
         const data = await res.json();
-        messages.push(data.assistant_message);
+        messages.push(Object.assign({}, data.assistant_message, {
+          metadata: {
+            citations: data.citations || [],
+            grounded: data.grounded,
+            fallback_used: data.fallback_used
+          }
+        }));
         announce(`${t('liveNewMessagePrefix')} ${t('title')}: ${data.assistant_message.content}`);
       } else {
         messages.push({
@@ -880,16 +916,33 @@
     }
   }
 
-  function handleHumanEscalation() {
+  async function handleHumanEscalation() {
     const consent = window.confirm(`${t('consentPrompt')}\n\n[OK] = ${t('confirmHuman')}`);
-    const escalationMsg = {
-      sender_type: 'agent',
-      content: `${t('humanEscalated')} (${consent ? 'Context shared' : 'Context private'})`
-    };
-    messages.push(escalationMsg);
+    try {
+      if (!sessionId && !(await initSession())) return;
+      const response = await fetch(`${API_BASE}/api/v1/support/requests/`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          subject: 'Learner requested human assistance',
+          description: 'Please contact the learner through this support request.',
+          category: 'course',
+          chat_session_id: sessionId,
+          learner_consent_chat_history: consent,
+          language: currentLang
+        })
+      });
+      if (!response.ok) throw new Error(t('supportUnavailable'));
+      const ticket = await response.json();
+      const result = `${t('supportSubmitted')} (ID: ${ticket.id})`;
+      messages.push({ sender_type: 'assistant', content: result });
+      announce(result);
+    } catch (err) {
+      messages.push({ sender_type: 'assistant', content: err.message || t('supportUnavailable') });
+      announce(t('supportUnavailable'));
+    }
     render();
     scrollMessagesToBottom();
-    announce(t('humanEscalated'));
   }
 
   function handleVoiceInput() {

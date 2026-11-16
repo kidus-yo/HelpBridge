@@ -90,6 +90,7 @@ class AccommodationRequestSerializer(serializers.ModelSerializer):
     Focuses solely on functional adjustments without requesting medical diagnosis.
     """
     job_title = serializers.CharField(source='job_listing.title', read_only=True)
+    guest_token = serializers.SerializerMethodField()
 
     class Meta:
         model = AccommodationRequest
@@ -121,8 +122,16 @@ class AccommodationRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("functional_needs must be a list of adjustment requirements.")
         return value
 
+    def get_guest_token(self, obj):
+        request = self.context.get('request')
+        if request and request.method == 'POST' and obj.learner_id is None:
+            return obj.guest_token
+        return ''
+
 
 class JobAlertSubscriptionSerializer(serializers.ModelSerializer):
+    guest_token = serializers.SerializerMethodField()
+
     class Meta:
         model = JobAlertSubscription
         fields = [
@@ -142,3 +151,9 @@ class JobAlertSubscriptionSerializer(serializers.ModelSerializer):
         if not isinstance(value, list):
             raise serializers.ValidationError("keywords must be a list of search terms.")
         return value
+
+    def get_guest_token(self, obj):
+        request = self.context.get('request')
+        if request and request.method == 'POST' and obj.learner_id is None:
+            return obj.guest_token
+        return ''

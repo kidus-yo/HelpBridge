@@ -25,6 +25,8 @@ class RetrievalTests(TestCase):
             {"title": "Course", "slug": slug, "language": language},
             format="json",
         ).data
+        published = client.post(f"/api/v1/courses/{course['id']}/publish/")
+        self.assertEqual(published.status_code, 200, published.data)
         payload = SimpleUploadedFile("material.txt", text.encode("utf-8"), content_type="text/plain")
         doc = client.post(
             "/api/v1/documents/",
@@ -37,13 +39,13 @@ class RetrievalTests(TestCase):
 
     def test_search_filters_by_institution_course_and_language(self):
         course_a, _ = self._seed(self.token_a, "Introduction to virtual assistant remote work in Ethiopia.", slug="a-en")
-        self._seed(self.token_a, "የስራ ማመልከቻ ሂደት", language="am", slug="a-am")
+        course_am, _ = self._seed(self.token_a, "የስራ ማመልከቻ ሂደት", language="am", slug="a-am")
         self._seed(self.token_b, "Secret payroll information for institution B", slug="b-en")
 
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token_a}")
         response = self.client.post(
             "/api/v1/knowledge/search/",
-            {"query": "virtual assistant remote work", "limit": 5},
+            {"query": "virtual assistant remote work", "course_id": course_a["id"], "limit": 5},
             format="json",
         )
         self.assertEqual(response.status_code, 200)
@@ -65,7 +67,7 @@ class RetrievalTests(TestCase):
 
         amharic = self.client.post(
             "/api/v1/knowledge/search/",
-            {"query": "ማመልከቻ", "language": "am"},
+            {"query": "ማመልከቻ", "language": "am", "course_id": course_am["id"]},
             format="json",
         )
         self.assertEqual(amharic.status_code, 200)

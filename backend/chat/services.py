@@ -1,22 +1,39 @@
 import logging
+from uuid import UUID
+
+from django.db.models import QuerySet
 from rest_framework.exceptions import NotFound, ValidationError as DRFValidationError
 from .models import ChatSession, Message
-from ai_engine.services.answer_service import AnswerGenerationService
+from ai_engine.services.answer_service import (
+    AnswerGenerationService,
+    KnowledgeRetrievalUnavailable,
+)
+from platforms.services.context import get_platform_context
 
 logger = logging.getLogger(__name__)
 
 _answer_service = AnswerGenerationService()
 
-def create_chat_session(institution_id='inst-default', course_id='course-va-101', channel='web', preferred_language='en', user=None):
+def create_chat_session(
+    institution_id=None,
+    course_id=None,
+    channel='web',
+    preferred_language='en',
+    user=None,
+    platform_integration_id=None,
+    platform_user_ref='',
+):
     """
     Creates a new chat session and initializes default accessibility preferences.
     """
     session = ChatSession.objects.create(
         user=user,
-        institution_id=institution_id or 'inst-default',
-        course_id=course_id or 'course-va-101',
+        institution_id=institution_id,
+        course_id=course_id,
         channel=channel,
         preferred_language=preferred_language,
+        platform_integration_id=platform_integration_id,
+        platform_user_ref=platform_user_ref,
         status='active'
     )
     from accessibility.models import AccessibilityPreference
@@ -26,6 +43,32 @@ def create_chat_session(institution_id='inst-default', course_id='course-va-101'
         preferred_language=preferred_language
     )
     return session
+
+
+def accessible_sessions(request) -> QuerySet[ChatSession]:
+    context = get_platform_context(request)
+    if context is not None:
+        sessions = ChatSession.objects.filter(
+            institution_id=str(context.institution_id),
+            platform_integration_id=context.integration_id,
+            platform_user_ref=context.user_ref,
+        )
+        if context.context_type == "course" and context.context_id:
+            sessions = sessions.filter(course_id=context.context_id)
+        else:
+            sessions = sessions.none()
+        return sessions
+    if request.user and request.user.is_authenticated:
+        return ChatSession.objects.filter(user=request.user)
+    return ChatSession.objects.none()
+
+
+def get_accessible_session(request, session_id: UUID | str) -> ChatSession:
+    try:
+        return accessible_sessions(request).get(id=session_id)
+    except (ChatSession.DoesNotExist, ValueError):
+        raise NotFound(detail="Chat session not found.")
+
 
 def process_learner_message(session_id, content: str, language: str = None):
     """
@@ -39,7 +82,7 @@ def process_learner_message(session_id, content: str, language: str = None):
     try:
         session = ChatSession.objects.get(id=session_id)
     except (ChatSession.DoesNotExist, ValueError):
-        raise NotFound(detail=f"ChatSession with ID {session_id} not found.")
+        raise NotFound(detail="Chat session not found.")
 
     if session.status != 'active':
         raise DRFValidationError(detail="This chat session is closed.")
@@ -60,15 +103,16 @@ def process_learner_message(session_id, content: str, language: str = None):
     )
 
     # 2. Call AnswerGenerationService with fallback safety
-    course_id = str(session.course_id) if session.course_id else 'course-va-101'
+    course_id = str(session.course_id) if session.course_id else None
     try:
         ai_result = _answer_service.answer_question(
             question=content,
             course_id=course_id,
-            language=msg_lang
+            language=msg_lang,
+            institution_id=session.institution_id,
         )
-    except Exception as exc:
-        logger.error(f"AI Engine failure for session {session_id}: {exc}", exc_info=True)
+    except KnowledgeRetrievalUnavailable:
+        logger.exception("Knowledge retrieval failed for chat session %s", session_id)
         fallback_msg = (
             "ይቅርታ፣ አሁን መልስ መስጠት አልቻልኩም። እባክዎ ትንሽ ቆይተው እንደገና ይሞክሩ ወይም የሰው ድጋፍ ሰጪ ይጠይቁ።"
             if msg_lang == 'am'
@@ -78,8 +122,9 @@ def process_learner_message(session_id, content: str, language: str = None):
             "answer": fallback_msg,
             "language": msg_lang,
             "grounded": False,
-            "fallback_used": True,
-            "citations": []
+            "fallback_used": False,
+            "citations": [],
+            "answer_status": "unavailable",
         }
 
     # 3. Store assistant message
@@ -91,7 +136,9 @@ def process_learner_message(session_id, content: str, language: str = None):
         metadata={
             "citations": ai_result.get("citations", []),
             "grounded": ai_result.get("grounded", False),
-            "fallback_used": ai_result.get("fallback_used", False)
+            "fallback_used": ai_result.get("fallback_used", False),
+            "answer_status": ai_result.get("answer_status", "available"),
+            "requested_language": ai_result.get("requested_language", msg_lang),
         }
     )
 
@@ -111,5 +158,6 @@ def process_learner_message(session_id, content: str, language: str = None):
         },
         "citations": ai_result.get("citations", []),
         "grounded": ai_result.get("grounded", False),
-        "fallback_used": ai_result.get("fallback_used", False)
+        "fallback_used": ai_result.get("fallback_used", False),
+        "answer_status": ai_result.get("answer_status", "available"),
     }

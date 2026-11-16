@@ -6,10 +6,21 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
 from drf_spectacular.utils import extend_schema, OpenApiResponse
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from django.shortcuts import get_object_or_404
+from chat.services import get_accessible_session
+from platforms.authentication import PlatformContextAuthentication
+from platforms.services.context import get_platform_context
 
 from support.models import SupportRequest, SupportMessage
-from support.permissions import IsTicketParticipantOrAgent, IsSupportAgentOrStaff, is_support_agent
+from support.permissions import (
+    AllowPublicOrScopedSupportCreate,
+    IsTicketParticipantOrAgent,
+    IsSupportAgentOrStaff,
+    is_support_agent,
+)
 from support.services import EscalationService
 from support.serializers import (
     SupportRequestListSerializer,
@@ -27,7 +38,8 @@ class SupportRequestListCreateView(generics.ListCreateAPIView):
     List support tickets (filtered to requester or all for agents),
     or create a new ticket with one-click escalation and optional chat consent.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [AllowAny, AllowPublicOrScopedSupportCreate]
+    authentication_classes = [SessionAuthentication, PlatformContextAuthentication]
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -43,7 +55,7 @@ class SupportRequestListCreateView(generics.ListCreateAPIView):
             return SupportRequest.objects.filter(learner=user).select_related('assigned_agent')
 
         # Guest tokens from headers or query param
-        guest_token = self.request.headers.get('X-Guest-Token') or self.request.query_params.get('guest_token')
+        guest_token = self.request.headers.get('X-Guest-Token')
         if guest_token:
             return SupportRequest.objects.filter(guest_token=guest_token).select_related('assigned_agent')
 
@@ -59,7 +71,22 @@ class SupportRequestListCreateView(generics.ListCreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        token = request.headers.get('X-Guest-Token') or request.data.get('guest_token')
+        context = get_platform_context(request)
+        institution_id = serializer.validated_data.get('institution_id')
+        chat_session_id = serializer.validated_data.get('chat_session_id')
+        language = serializer.validated_data.get('language', 'en')
+        token = request.headers.get('X-Guest-Token')
+        if context is not None:
+            if institution_id and str(institution_id) != str(context.institution_id):
+                raise PermissionDenied("Institution ID does not match authenticated tenant context.")
+            institution_id = context.institution_id
+            language = serializer.validated_data.get('language') or context.preferred_language
+            token = None
+
+        if chat_session_id:
+            session = get_accessible_session(request, chat_session_id)
+            if institution_id and str(session.institution_id) != str(institution_id):
+                raise PermissionDenied("Chat session does not belong to this institution.")
         ticket = EscalationService.create_support_request(
             subject=serializer.validated_data['subject'],
             description=serializer.validated_data['description'],
@@ -68,13 +95,16 @@ class SupportRequestListCreateView(generics.ListCreateAPIView):
             preferred_assistance_mode=serializer.validated_data.get('preferred_assistance_mode', 'chat'),
             learner=request.user if request.user.is_authenticated else None,
             guest_token=token,
-            institution_id=serializer.validated_data.get('institution_id'),
-            chat_session_id=serializer.validated_data.get('chat_session_id'),
+            institution_id=institution_id,
+            chat_session_id=chat_session_id,
             learner_consent_chat_history=serializer.validated_data.get('learner_consent_chat_history', False),
-            language=serializer.validated_data.get('language', 'en')
+            language=language
         )
 
-        response_serializer = SupportRequestDetailSerializer(ticket)
+        response_serializer = SupportRequestDetailSerializer(
+            ticket,
+            context={"request": request},
+        )
         headers = self.get_success_headers(response_serializer.data)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
@@ -125,6 +155,8 @@ class SupportMessageListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         ticket_id = self.kwargs['id']
+        ticket = get_object_or_404(SupportRequest, id=ticket_id)
+        self.check_object_permissions(self.request, ticket)
         return SupportMessage.objects.filter(support_request_id=ticket_id)
 
     @extend_schema(
@@ -183,12 +215,15 @@ class ScreenShareControlView(APIView):
         serializer.is_valid(raise_exception=True)
         action = serializer.validated_data['action']
 
-        if action == 'start':
-            result = EscalationService.start_screen_share(ticket)
-        else:
-            result = EscalationService.stop_screen_share(ticket)
-
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "error": {
+                    "code": "screen_sharing_unavailable",
+                    "message": "Real-time screen sharing is not configured. Use text support instead.",
+                }
+            },
+            status=status.HTTP_501_NOT_IMPLEMENTED,
+        )
 
 
 class ScreenSnapshotView(APIView):

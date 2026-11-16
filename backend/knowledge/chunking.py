@@ -34,6 +34,7 @@ def split_pages(
     chunks: list[PreparedChunk] = []
     heading = ""
     for page in pages:
+        heading = page.section_heading or heading
         cleaned = normalize_text(page.text)
         if not cleaned:
             continue
@@ -51,7 +52,7 @@ def split_pages(
         for paragraph in _split_paragraphs(cleaned):
             maybe_heading = paragraph.strip()
             if _looks_like_heading(maybe_heading):
-                heading = maybe_heading[:255]
+                heading = maybe_heading.lstrip("# ").strip()[:255]
             for piece in _window(paragraph, max_chars, overlap):
                 chunks.append(
                     PreparedChunk(

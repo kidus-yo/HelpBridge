@@ -71,6 +71,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "common.middleware.WidgetCorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -130,6 +131,7 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [ROOT_DIR / "frontend"]
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
 
@@ -164,7 +166,7 @@ AI_PROVIDER = env("AI_PROVIDER", default="offline")
 AI_CLOUD_PROVIDER = env("AI_CLOUD_PROVIDER", default="openai")
 AI_CLOUD_API_KEY = env("AI_CLOUD_API_KEY", default="")
 AI_CLOUD_MODEL = env("AI_CLOUD_MODEL", default="gpt-4o-mini")
-AI_LOCAL_ENDPOINT = env("AI_LOCAL_ENDPOINT", default="http://localhost:11434/v1")
+AI_LOCAL_ENDPOINT = env("AI_LOCAL_ENDPOINT", default="")
 AI_LOCAL_MODEL = env("AI_LOCAL_MODEL", default="llama3")
 AI_GROUNDING_THRESHOLD = env.float("AI_GROUNDING_THRESHOLD", default=0.20)
 
@@ -176,6 +178,9 @@ SMS_GATEWAY_API_KEY = env("SMS_GATEWAY_API_KEY", default="")
 SMS_DEFAULT_SENDER = env("SMS_DEFAULT_SENDER", default="+251911000000")
 
 DEFAULT_LANGUAGE = env("DEFAULT_LANGUAGE", default="am")
+CHANNEL_PLATFORM_INTEGRATION_ID = env("CHANNEL_PLATFORM_INTEGRATION_ID", default="")
+CHANNEL_DEFAULT_COURSE_ID = env("CHANNEL_DEFAULT_COURSE_ID", default="")
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 
 PLATFORM_CONTEXT_SIGNING_KEY = env("PLATFORM_CONTEXT_SIGNING_KEY", default=SECRET_KEY)
 PLATFORM_CONTEXT_TTL_SECONDS = env.int("PLATFORM_CONTEXT_TTL_SECONDS", default=900)

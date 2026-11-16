@@ -9,6 +9,7 @@ from platforms.models import Institution
 class KnowledgeDocument(TimeStampedUUIDModel):
     class DocumentType(models.TextChoices):
         PDF = "pdf", "PDF"
+        DOCX = "docx", "DOCX"
         TXT = "txt", "Plain text"
 
     class ProcessingStatus(models.TextChoices):

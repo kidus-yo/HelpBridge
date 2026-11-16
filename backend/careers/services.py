@@ -244,15 +244,25 @@ class JobAlertService:
                 )
 
             try:
-                send_notification(
+                result = send_notification(
                     recipient=sub.contact_identity,
                     message=msg,
                     channel=sub.channel,
                     title=title
                 )
-                dispatched_count += 1
-            except Exception as e:
-                logger.error(f"Failed to dispatch alert to {sub.contact_identity} via {sub.channel}: {e}")
+                if result.get("status") in {"pending", "sent", "delivered"}:
+                    dispatched_count += 1
+                else:
+                    logger.warning(
+                        "Job alert delivery failed for subscription %s (status=%s).",
+                        sub.id,
+                        result.get("status", "unknown"),
+                    )
+            except Exception:
+                logger.exception(
+                    "Could not dispatch job alert for subscription %s.",
+                    sub.id,
+                )
 
         logger.info(f"Dispatched {dispatched_count} alerts for job {job.id}.")
         return dispatched_count

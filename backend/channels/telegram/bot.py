@@ -5,11 +5,14 @@ Telegram Bot Message Handler and Workflow Dispatcher.
 import logging
 from typing import Dict, Any, Optional
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from channels.models import ChannelIdentity
 from channels.telegram.client import TelegramClient
-from common.contracts import MockChatService
-from ai_engine.services.answer_service import generate_answer
+from channels.services import get_or_create_central_chat_session
+from chat.services import process_learner_message
 from ai_engine.services.prompt_templates import format_citations_markdown
+from accessibility.models import AccessibilityPreference
+from chat.models import ChatSession
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,7 @@ class TelegramBotHandler:
         if data == "set_lang_am":
             identity.preferred_language = "am"
             identity.save(update_fields=['preferred_language', 'updated_at'])
+            self._update_session_language(identity)
             self.client.answer_callback_query(cb_id, text="ቋንቋዎ ወደ አማርኛ ተቀይሯል!")
             self.client.send_message(
                 chat_id=chat_id,
@@ -64,6 +68,7 @@ class TelegramBotHandler:
         elif data == "set_lang_en":
             identity.preferred_language = "en"
             identity.save(update_fields=['preferred_language', 'updated_at'])
+            self._update_session_language(identity)
             self.client.answer_callback_query(cb_id, text="Language set to English!")
             self.client.send_message(
                 chat_id=chat_id,
@@ -91,16 +96,6 @@ class TelegramBotHandler:
                 'is_active': True
             }
         )
-
-        # Connect or create chat session
-        if not identity.session_id:
-            session = MockChatService.get_or_create_session_for_channel(
-                channel='telegram',
-                external_id=user_id,
-                preferred_language=identity.preferred_language
-            )
-            identity.session_id = session.get('id')
-            identity.save(update_fields=['session_id', 'updated_at'])
 
         lang = identity.preferred_language
 
@@ -148,38 +143,39 @@ class TelegramBotHandler:
             self.client.send_message(chat_id=chat_id, text=help_text)
             return {"ok": True, "action": "help"}
 
-        # Record learner message in central conversation lifecycle
-        MockChatService.append_message(
-            session_id=identity.session_id,
-            sender_type='learner',
-            content=text,
-            language=lang
-        )
+        try:
+            session = get_or_create_central_chat_session(identity, "telegram")
+        except ImproperlyConfigured:
+            reply_content = (
+                "ይቅርታ፣ ይህ የመልዕክት ቻናል ገና አልተዋቀረም።"
+                if lang == "am"
+                else "This messaging channel is not configured for a published course yet."
+            )
+            self.client.send_message(chat_id=chat_id, text=reply_content)
+            return {"ok": True, "action": "unavailable", "grounded": False}
 
-        # Generate evidence-grounded answer
-        ai_result = generate_answer(
-            question=text,
-            language=lang
-        )
-
-        reply_content = ai_result.get("answer", "")
-        citations = ai_result.get("citations", [])
+        result = process_learner_message(session.id, text, language=lang)
+        reply_content = result["assistant_message"]["content"]
+        citations = result.get("citations", [])
         if citations:
             reply_content += format_citations_markdown(citations, language=lang)
-
-        # Record assistant reply
-        MockChatService.append_message(
-            session_id=identity.session_id,
-            sender_type='assistant',
-            content=reply_content,
-            language=lang,
-            metadata={'grounded': ai_result.get('grounded'), 'citations': citations}
-        )
 
         self.client.send_message(chat_id=chat_id, text=reply_content)
         return {
             "ok": True,
             "action": "answer",
-            "grounded": ai_result.get("grounded"),
+            "grounded": result.get("grounded"),
             "citations_count": len(citations)
         }
+
+    @staticmethod
+    def _update_session_language(identity):
+        if not identity.session_id:
+            return
+
+        ChatSession.objects.filter(id=identity.session_id).update(
+            preferred_language=identity.preferred_language
+        )
+        AccessibilityPreference.objects.filter(session_id=identity.session_id).update(
+            preferred_language=identity.preferred_language
+        )

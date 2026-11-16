@@ -6,13 +6,15 @@ Fulfills Hackathon Track 3 requirement:
 """
 
 import logging
-from typing import Dict, Any, Optional
-from datetime import datetime, timezone
+from typing import Dict, Any
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from channels.models import ChannelIdentity, MessageDelivery
+from channels.services import get_or_create_central_chat_session
 from channels.sms.normalizer import normalize_ethiopian_phone
-from common.contracts import MockChatService
-from ai_engine.services.answer_service import generate_answer
+from accessibility.models import AccessibilityPreference
+from chat.models import ChatSession
+from chat.services import process_learner_message
 from ai_engine.services.prompt_templates import format_citations_sms
 
 logger = logging.getLogger(__name__)
@@ -35,8 +37,8 @@ class SMSAdapter:
         # 1. Normalize phone
         try:
             phone = normalize_ethiopian_phone(from_phone)
-        except ValueError as err:
-            logger.warning("Rejected SMS from invalid phone: %s (%s)", from_phone, err)
+        except ValueError:
+            logger.warning("Rejected SMS from an invalid phone number.")
             return "Invalid Ethiopian phone number. Use 09... or 07... format."[:cls.MAX_SMS_LENGTH]
 
         # 2. Get or create ChannelIdentity
@@ -55,38 +57,28 @@ class SMSAdapter:
         if text_upper in ('LANG AM', 'AMHARIC', 'አማርኛ'):
             identity.preferred_language = 'am'
             identity.save(update_fields=['preferred_language', 'updated_at'])
+            cls._update_session_language(identity)
             return "ቋንቋዎ ወደ አማርኛ ተቀይሯል። ጥያቄዎን አሁን መላክ ይችላሉ።"[:cls.MAX_SMS_LENGTH]
         elif text_upper in ('LANG EN', 'ENGLISH'):
             identity.preferred_language = 'en'
             identity.save(update_fields=['preferred_language', 'updated_at'])
+            cls._update_session_language(identity)
             return "Language switched to English. You can now text your question."[:cls.MAX_SMS_LENGTH]
 
-        # 4. Attach chat session
-        if not identity.session_id:
-            session = MockChatService.get_or_create_session_for_channel(
-                channel='sms',
-                external_id=phone,
-                preferred_language=identity.preferred_language
-            )
-            identity.session_id = session.get('id')
-            identity.save(update_fields=['session_id', 'updated_at'])
+        try:
+            session = get_or_create_central_chat_session(identity, "sms")
+        except ImproperlyConfigured:
+            return (
+                "This SMS channel is not configured for a published course yet."
+            )[:cls.MAX_SMS_LENGTH]
 
-        # Store learner message in chat history
-        MockChatService.append_message(
-            session_id=identity.session_id,
-            sender_type='learner',
-            content=raw_text,
-            language=identity.preferred_language
+        result = process_learner_message(
+            session.id,
+            raw_text,
+            language=identity.preferred_language,
         )
-
-        # 5. Generate grounded answer
-        ai_result = generate_answer(
-            question=raw_text,
-            language=identity.preferred_language
-        )
-
-        answer_body = ai_result.get('answer', '').strip()
-        citations = ai_result.get('citations', [])
+        answer_body = result["assistant_message"]["content"].strip()
+        citations = result.get("citations", [])
         cite_str = format_citations_sms(citations, language=identity.preferred_language)
 
         # 6. Format and clamp reply to <= 160 characters
@@ -100,15 +92,6 @@ class SMSAdapter:
             answer_body = f"{truncated}..."
 
         final_sms = f"{answer_body}{cite_str}".strip()[:cls.MAX_SMS_LENGTH]
-
-        # Store assistant response in chat history
-        MockChatService.append_message(
-            session_id=identity.session_id,
-            sender_type='assistant',
-            content=final_sms,
-            language=identity.preferred_language,
-            metadata={'grounded': ai_result.get('grounded'), 'citations': citations}
-        )
 
         return final_sms
 
@@ -127,8 +110,8 @@ class SMSAdapter:
             channel='sms',
             recipient=phone,
             content=clamped_text,
-            status='delivered',  # Simulated delivery in hackathon environment
-            delivered_at=datetime.now(timezone.utc)
+            status='failed',
+            error_message='No SMS delivery provider adapter is configured.',
         )
 
         return {
@@ -137,5 +120,15 @@ class SMSAdapter:
             "recipient": phone,
             "status": delivery.status,
             "content": clamped_text,
-            "delivered_at": delivery.delivered_at.isoformat()
+            "delivered_at": None
         }
+
+    @staticmethod
+    def _update_session_language(identity):
+        if identity.session_id:
+            ChatSession.objects.filter(id=identity.session_id).update(
+                preferred_language=identity.preferred_language
+            )
+            AccessibilityPreference.objects.filter(
+                session_id=identity.session_id
+            ).update(preferred_language=identity.preferred_language)

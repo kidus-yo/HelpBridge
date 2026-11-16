@@ -96,7 +96,9 @@ def issue_platform_context_token(
         raise PlatformContextError("Unsupported context type.", "invalid_context_type")
     if not user_ref or len(user_ref) > 128:
         raise PlatformContextError("user_ref is required and must be pseudonymous.", "invalid_user_ref")
-    language = preferred_language if is_supported_language(preferred_language) else "en"
+    if not is_supported_language(preferred_language):
+        raise PlatformContextError("Unsupported preferred language.", "unsupported_language")
+    language = preferred_language
 
     permitted = set(integration.permitted_scopes or DEFAULT_SCOPES)
     requested = list(scopes or permitted)
@@ -170,6 +172,9 @@ def parse_and_validate_token(token: str) -> PlatformContext:
     context_type = payload.get("context_type") or "general"
     if context_type not in CONTEXT_TYPES:
         raise PlatformContextError("Unsupported context type.", "invalid_context_type")
+    preferred_language = payload.get("preferred_language")
+    if not is_supported_language(preferred_language):
+        raise PlatformContextError("Unsupported preferred language.", "unsupported_language")
 
     expiry = datetime.fromtimestamp(int(exp), tz=timezone.utc)
     return PlatformContext(
@@ -180,7 +185,7 @@ def parse_and_validate_token(token: str) -> PlatformContext:
         context_type=context_type,
         context_id=payload.get("context_id"),
         scopes=scopes,
-        preferred_language=payload.get("preferred_language") or "en",
+        preferred_language=preferred_language,
         token_issuer=payload.get("iss") or "",
         token_audience=payload.get("aud") or "",
         token_expiry=expiry,

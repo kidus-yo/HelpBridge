@@ -2,13 +2,16 @@
 Views and Webhook Handlers for Telegram, SMS, and Job Notification Delivery.
 """
 
+import hmac
+
 from django.http import HttpResponse
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, BasePermission
+from rest_framework.authentication import SessionAuthentication
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from channels.models import MessageDelivery
 from channels.serializers import (
@@ -19,6 +22,8 @@ from channels.serializers import (
 from channels.sms.adapter import SMSAdapter
 from channels.telegram.bot import TelegramBotHandler
 from channels.notifications.delivery import send_notification
+from platforms.authentication import IntegrationApiKeyAuthentication
+from platforms.permissions import IsStaffUser
 
 
 class TelegramWebhookSerializer(serializers.Serializer):
@@ -49,6 +54,21 @@ def sms_inbound_view(request):
     """
     if request.method == 'GET':
         return HttpResponse("SMS Inbound Gateway Endpoint Ready. Use POST.", content_type="text/plain")
+
+    gateway_key = getattr(settings, "SMS_GATEWAY_API_KEY", "")
+    supplied_key = request.headers.get("X-SMS-Gateway-Key", "")
+    if not gateway_key:
+        return HttpResponse(
+            "SMS gateway is not configured.",
+            content_type="text/plain; charset=utf-8",
+            status=503,
+        )
+    if not hmac.compare_digest(supplied_key, gateway_key):
+        return HttpResponse(
+            "Unauthorized SMS gateway request.",
+            content_type="text/plain; charset=utf-8",
+            status=403,
+        )
 
     serializer = SMSInboundSerializer(data=request.data)
     if not serializer.is_valid():
@@ -83,12 +103,28 @@ class TelegramWebhookView(APIView):
         secret = getattr(settings, 'TELEGRAM_WEBHOOK_SECRET', '')
         if secret:
             header_secret = request.headers.get('X-Telegram-Bot-Api-Secret-Token', '')
-            if header_secret != secret:
+            if not hmac.compare_digest(header_secret, secret):
                 return Response({"error": "Unauthorized webhook token"}, status=status.HTTP_403_FORBIDDEN)
+        elif getattr(settings, "DJANGO_ENV", "development") == "production":
+            return Response(
+                {"error": {"code": "webhook_not_configured"}},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         handler = TelegramBotHandler()
         res = handler.handle_update(request.data)
         return Response(res, status=status.HTTP_200_OK)
+
+
+class StaffOrNotificationIntegration(BasePermission):
+    def has_permission(self, request, view):
+        if request.user and request.user.is_authenticated and request.user.is_staff:
+            return True
+        integration = getattr(request, "platform_integration", None)
+        return bool(
+            integration
+            and "notifications:send" in (integration.permitted_scopes or [])
+        )
 
 
 class NotificationSendView(APIView):
@@ -97,13 +133,17 @@ class NotificationSendView(APIView):
     Used by Yensew (Developer 4) for sending Job Alerts and Career notifications.
     """
 
+    authentication_classes = [SessionAuthentication, IntegrationApiKeyAuthentication]
+    permission_classes = [StaffOrNotificationIntegration]
+
     @extend_schema(
         summary="Send Outbound Notification (Telegram/SMS)",
         description="Dispatches a job alert or system notification to a learner via Telegram or SMS.",
         request=NotificationSendSerializer,
         responses={
-            201: OpenApiResponse(response=MessageDeliverySerializer, description="Notification queued/delivered"),
-            400: OpenApiResponse(description="Validation error")
+            201: OpenApiResponse(response=MessageDeliverySerializer, description="Notification sent"),
+            400: OpenApiResponse(description="Validation error"),
+            503: OpenApiResponse(description="No delivery provider is configured"),
         }
     )
     def post(self, request):
@@ -122,13 +162,20 @@ class NotificationSendView(APIView):
                 channel=data.get('channel', 'telegram'),
                 title=data.get('title')
             )
-            return Response(result, status=status.HTTP_201_CREATED)
+            response_status = (
+                status.HTTP_201_CREATED
+                if result.get("status") in {"pending", "sent", "delivered"}
+                else status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+            return Response(result, status=response_status)
         except ValueError as err:
             return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DeliveryStatusView(APIView):
     """Check the delivery status of an outbound notification."""
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
 
     @extend_schema(
         summary="Get Delivery Status",

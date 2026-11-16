@@ -3,12 +3,21 @@ Permissions for Support Requests and Live Help Messaging.
 """
 
 from rest_framework import permissions
+from platforms.services.context import get_platform_context
 
 
 def is_support_agent(user):
     return user and user.is_authenticated and (
         user.is_staff or user.groups.filter(name='SupportAgent').exists()
     )
+
+
+class AllowPublicOrScopedSupportCreate(permissions.BasePermission):
+    def has_permission(self, request, view):
+        context = get_platform_context(request)
+        if context is not None:
+            return context.has_scope("support:write")
+        return True
 
 
 class IsTicketParticipantOrAgent(permissions.BasePermission):

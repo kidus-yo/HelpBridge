@@ -1,9 +1,11 @@
 from rest_framework.views import APIView
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.generics import get_object_or_404
 from drf_spectacular.utils import extend_schema
-from chat.models import ChatSession
+from chat.permissions import IsStaffOrScopedPlatformContext
+from chat.services import get_accessible_session
+from platforms.authentication import PlatformContextAuthentication
 from .models import AccessibilityPreference
 from .serializers import (
     AccessibilityPreferenceSerializer,
@@ -16,8 +18,11 @@ class AccessibilityPreferenceDetailView(APIView):
     PATCH /api/v1/accessibility/preferences/{session_id}/ - Update accessibility/language preferences.
     """
 
+    authentication_classes = [SessionAuthentication, PlatformContextAuthentication]
+    permission_classes = [IsStaffOrScopedPlatformContext]
+
     def get_object(self, session_id):
-        session = get_object_or_404(ChatSession, id=session_id)
+        session = get_accessible_session(self.request, session_id)
         pref, _ = AccessibilityPreference.objects.get_or_create(
             session=session,
             defaults={
